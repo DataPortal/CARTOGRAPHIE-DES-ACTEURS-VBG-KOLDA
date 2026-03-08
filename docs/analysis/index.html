@@ -69,6 +69,38 @@
       font-weight:900;
       color:#1f5fa8;
     }
+
+    .narrative-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+      gap:18px;
+      margin-bottom:24px;
+    }
+
+    .narrative-card{
+      background:#fff;
+      border:1px solid rgba(11,18,32,.12);
+      border-radius:12px;
+      box-shadow:0 8px 20px rgba(11,18,32,.06);
+      padding:18px;
+    }
+
+    .narrative-card h3{
+      margin:0 0 10px;
+      font-size:17px;
+      color:#0b1220;
+    }
+
+    .narrative-card p{
+      margin:0 0 10px;
+      font-size:14px;
+      line-height:1.6;
+      color:#334155;
+    }
+
+    .narrative-card p:last-child{
+      margin-bottom:0;
+    }
   </style>
 </head>
 <body>
@@ -120,6 +152,78 @@
     <div class="kpi">
       <div class="label">Types de services VBG</div>
       <div class="value" id="kpiServices">0</div>
+    </div>
+  </div>
+
+  <div class="narrative-grid">
+    <div class="narrative-card">
+      <h3>1. Vue d’ensemble du système de réponse aux VBG</h3>
+      <p>
+        La cartographie met en évidence un dispositif composé d’acteurs institutionnels et d’organisations de la société civile. Les services étatiques assurent les fonctions régaliennes, l’encadrement institutionnel et plusieurs services spécialisés, tandis que les ONG et associations assurent des fonctions de proximité, de prévention, d’écoute, de sensibilisation et d’orientation.
+      </p>
+      <p>
+        Cette complémentarité constitue un atout majeur pour la réponse aux VBG dans la région de Kolda. Elle montre qu’aucune catégorie d’acteurs ne peut, à elle seule, couvrir l’ensemble des besoins, ce qui renforce l’importance d’une coordination efficace entre institutions publiques, structures communautaires et partenaires techniques.
+      </p>
+    </div>
+
+    <div class="narrative-card">
+      <h3>2. Structure des acteurs intervenant dans la réponse</h3>
+      <p>
+        La répartition des acteurs reflète un système hybride combinant services publics et organisations non gouvernementales. Les structures étatiques occupent une place centrale dans la santé, l’action sociale, l’éducation et la protection, tandis que les OSC renforcent l’accès communautaire, la mobilisation sociale et l’accompagnement des survivantes.
+      </p>
+      <p>
+        Cette diversité d’acteurs favorise une réponse multisectorielle. Toutefois, elle implique aussi un besoin accru d’harmonisation des pratiques, de clarification des rôles et de coordination opérationnelle pour éviter les doublons et maximiser l’impact collectif.
+      </p>
+    </div>
+
+    <div class="narrative-card">
+      <h3>3. Distribution territoriale des services</h3>
+      <p>
+        L’analyse territoriale montre que les acteurs interviennent à Kolda, Vélingara et Médina Yoro Foulah, mais avec une intensité variable. Certaines zones paraissent mieux dotées en structures et en diversité de services, tandis que d’autres affichent une couverture plus réduite ou moins spécialisée.
+      </p>
+      <p>
+        Cette lecture spatiale confirme l’intérêt d’identifier les zones à faible densité de services afin d’orienter les efforts de planification, de déploiement et de renforcement institutionnel vers les départements et communes les plus sous-desservis.
+      </p>
+    </div>
+
+    <div class="narrative-card">
+      <h3>4. Typologie des services disponibles</h3>
+      <p>
+        Les services recensés couvrent plusieurs dimensions essentielles de la réponse VBG : prévention, sensibilisation, référencement, accompagnement psychosocial, appui médical, assistance juridique, protection de l’enfance et autonomisation économique.
+      </p>
+      <p>
+        Cette diversité témoigne d’une approche multisectorielle. Néanmoins, la présence d’un service dans la base ne garantit pas toujours son accessibilité effective ni sa disponibilité continue, ce qui justifie une lecture qualitative complémentaire des capacités opérationnelles réelles.
+      </p>
+    </div>
+
+    <div class="narrative-card">
+      <h3>5. Principales contraintes identifiées</h3>
+      <p>
+        Les informations collectées montrent plusieurs défis récurrents : insuffisance de financement, manque de ressources humaines qualifiées, faibles capacités logistiques, difficultés d’accès aux zones enclavées, absence ou faiblesse de dispositifs d’accueil et de prise en charge intégrée.
+      </p>
+      <p>
+        À cela s’ajoutent des obstacles socioculturels persistants, notamment la banalisation des violences, le silence communautaire, la faible appropriation des mécanismes de protection et certaines normes sociales défavorables à la dénonciation et à la prise en charge des cas.
+      </p>
+    </div>
+
+    <div class="narrative-card">
+      <h3>6. Indice de couverture des services VBG</h3>
+      <p>
+        L’indice de couverture VBG proposé dans ce dashboard mesure, de façon simple, la capacité relative des départements à offrir une réponse aux VBG. Il combine le nombre d’acteurs présents et la diversité des types de services disponibles dans chaque territoire.
+      </p>
+      <p>
+        Un indice plus élevé suggère une meilleure densité et une plus grande diversité d’interventions. À l’inverse, un indice plus faible peut signaler un besoin de renforcement territorial, soit en augmentant le nombre d’acteurs, soit en élargissant le spectre des services disponibles.
+      </p>
+    </div>
+
+    <div class="narrative-card">
+      <h3>7. Messages stratégiques pour renforcer la réponse</h3>
+      <p>
+        Les résultats mettent en évidence la nécessité de consolider la coordination entre acteurs institutionnels et communautaires, de renforcer les capacités opérationnelles locales, d’améliorer la couverture géographique et de développer des mécanismes de référencement plus robustes.
+      </p>
+      <p>
+        Le renforcement de la prévention communautaire, de la prise en charge psychosociale, de l’accès à la justice, de l’autonomisation économique et de la durabilité financière du dispositif apparaît comme un levier essentiel pour améliorer la réponse aux VBG dans la région de Kolda.
+      </p>
     </div>
   </div>
 
@@ -512,7 +616,6 @@
     document.getElementById("kpiOsc").textContent = oscActors;
     document.getElementById("kpiServices").textContent = uniqueServices;
 
-    // Acteurs par type
     const actorCounts = countBy(rows, r => safe(r.actor_type));
     createDoughnutChart(
       "chartActors",
@@ -521,7 +624,6 @@
       [PALETTE.blue, PALETTE.orange, PALETTE.slate]
     );
 
-    // Acteurs par département
     const deptCounts = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
     createBarChart(
       "chartDepartments",
@@ -531,7 +633,6 @@
       [PALETTE.teal, PALETTE.blue, PALETTE.violet]
     );
 
-    // Services VBG
     const serviceCounts = countMulti(rows, r => splitValues(r.service_gbv_type));
     createHorizontalBarChart(
       "chartServices",
@@ -541,7 +642,6 @@
       [PALETTE.orange, PALETTE.amber, PALETTE.green, PALETTE.cyan, PALETTE.violet, PALETTE.rose, PALETTE.sky]
     );
 
-    // Couverture
     const coverageCounts = countBy(rows, r => safe(r.coverage_level));
     createDoughnutChart(
       "chartCoverage",
@@ -550,7 +650,6 @@
       [PALETTE.indigo, PALETTE.cyan, PALETTE.green, PALETTE.amber, PALETTE.rose]
     );
 
-    // Gaps
     const gapClasses = {};
     rows.forEach(r => {
       const g = classifyGap(r.gaps);
@@ -565,7 +664,6 @@
       [PALETTE.red, PALETTE.orange, PALETTE.amber, PALETTE.violet, PALETTE.slate, PALETTE.teal]
     );
 
-    // Coverage index
     renderCoverageIndex(rows);
   }
 
