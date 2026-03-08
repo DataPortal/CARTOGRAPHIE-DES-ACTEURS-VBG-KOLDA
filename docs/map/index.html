@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Carte des acteurs VBG</title>
+
+<link rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+
+body{
+margin:0;
+font-family:Segoe UI;
+}
+
+header{
+background:#1f5fa8;
+color:white;
+padding:15px;
+text-align:center;
+}
+
+#map{
+height:90vh;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+<h2>Carte des acteurs VBG — Région de Kolda</h2>
+<a href="../" style="color:white;">Accueil</a>
+</header>
+
+<div id="map"></div>
+
+<script>
+
+const CSV_URL="../data/actors_vbg_kolda_geo_ready.csv";
+
+const map=L.map("map").setView([12.8985,-14.9413],9);
+
+L.tileLayer(
+"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+{attribution:"© OpenStreetMap"}
+).addTo(map);
+
+Papa.parse(CSV_URL,{
+download:true,
+header:true,
+
+complete:function(res){
+
+res.data.forEach(row=>{
+
+if(row.latitude && row.longitude){
+
+const marker=L.marker([row.latitude,row.longitude]).addTo(map);
+
+marker.bindPopup(
+"<b>"+row.structure+"</b><br>"+
+row.actor_type+"<br>"+
+row.service_domains
+);
+
+}
+
+});
+
+}
+
+});
+
+</script>
+
+</body>
+</html>
