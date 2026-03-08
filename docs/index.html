@@ -10,7 +10,7 @@
 
 <header>
   <h1>Cartographie des acteurs VBG — Région de Kolda</h1>
-  <p>Plateforme simple de consultation des données, de visualisation cartographique et d’analyse.</p>
+  <p>Plateforme de consultation des données, cartographie et analyse du système VBG.</p>
 
   <div class="top-links">
     <a href="./table/">Base de données</a>
@@ -44,19 +44,19 @@
   <div class="grid">
     <div class="card" style="padding:20px;">
       <h2 class="section-title">Carte interactive</h2>
-      <p>Visualiser les structures, filtrer par type d’acteur et explorer leur couverture territoriale.</p>
+      <p>Polygones admin2, points des acteurs, et heatmap de concentration.</p>
       <a class="btn btn-primary" href="./map/">Ouvrir la carte</a>
     </div>
 
     <div class="card" style="padding:20px;">
       <h2 class="section-title">Base de données</h2>
-      <p>Consulter l’ensemble des structures dans un tableau détaillé avec filtres utiles.</p>
+      <p>Table complète avec recherche et filtres multi-critères.</p>
       <a class="btn btn-primary" href="./table/">Voir la table</a>
     </div>
 
     <div class="card" style="padding:20px;">
       <h2 class="section-title">Analyse</h2>
-      <p>Voir les indicateurs, les graphiques, l’analyse des gaps et l’indice de couverture VBG.</p>
+      <p>KPI, répartition territoriale, services, gaps et indice de couverture VBG.</p>
       <a class="btn btn-primary" href="./analysis/">Voir l’analyse</a>
     </div>
   </div>
@@ -75,7 +75,6 @@ Papa.parse(CSV_URL, {
   skipEmptyLines: true,
   complete: function(res){
     const rows = res.data || [];
-
     const total = rows.length;
     const state = rows.filter(r => safe(r.actor_type).toLowerCase().includes("étatique")).length;
     const osc = total - state;
