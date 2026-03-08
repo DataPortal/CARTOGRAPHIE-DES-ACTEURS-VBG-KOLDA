@@ -18,9 +18,20 @@
       color: var(--muted);
     }
 
-    .leaflet-popup-content{
+    .leaflet-popup-content,
+    .leaflet-tooltip{
       font-size: 13px;
       line-height: 1.45;
+    }
+
+    .dept-tooltip{
+      min-width: 240px;
+    }
+
+    .dept-tooltip hr{
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 8px 0;
     }
 
     .legend-box{
@@ -85,8 +96,7 @@
 <div class="container">
   <div class="card" style="padding:16px;">
     <p class="map-toolbar-note">
-      La navigation est limitée au Sénégal. Les départements de <strong>Kolda</strong>, <strong>Vélingara</strong> et
-      <strong>Médina Yoro Foulah</strong> sont mis en évidence.
+      La navigation est limitée au Sénégal. Survole un département pour voir son résumé, ou clique dessus pour filtrer la carte.
     </p>
 
     <div class="filters" style="margin-bottom:12px;">
@@ -277,6 +287,10 @@
     return actorOk && deptOk && serviceOk;
   }
 
+  function getFilteredRows(){
+    return allRows.filter(actorMatches);
+  }
+
   function buildPopup(row){
     return `
       <strong>${safe(row.structure)}</strong><br>
@@ -289,6 +303,53 @@
       <b>Contact :</b> ${safe(row.contact_name)}<br>
       <b>Téléphone :</b> ${safe(row.phone)}<br>
       <b>Email :</b> ${safe(row.email)}
+    `;
+  }
+
+  function getDepartmentStats(deptName){
+    const normalizedDept = normalizeDeptName(deptName);
+
+    const rows = getFilteredRows().filter(r => {
+      const rowDepts = splitValues(r["departement(s)"]).map(normalizeDeptName);
+      return rowDepts.includes(normalizedDept);
+    });
+
+    const totalActors = rows.length;
+    const stateActors = rows.filter(r => isStateActor(r.actor_type)).length;
+    const oscActors = totalActors - stateActors;
+
+    const services = [...new Set(
+      rows.flatMap(r => splitValues(r.service_gbv_type))
+    )];
+
+    return {
+      totalActors,
+      stateActors,
+      oscActors,
+      servicesCount: services.length,
+      servicesPreview: services.slice(0, 5)
+    };
+  }
+
+  function buildDepartmentTooltip(feature){
+    const props = feature.properties || {};
+    const deptName = normalizeDeptName(props.adm2_name);
+    const regionName = safe(props.adm1_name);
+    const isTarget = departmentInScope(deptName);
+    const stats = getDepartmentStats(deptName);
+
+    return `
+      <div class="dept-tooltip">
+        <strong>${deptName}</strong><br>
+        <span style="color:#5b6b80;">Région : ${regionName}</span><br>
+        <span style="color:#5b6b80;">Département ciblé : ${isTarget ? "Oui" : "Non"}</span>
+        <hr>
+        <strong>Acteurs :</strong> ${stats.totalActors}<br>
+        <strong>Services étatiques :</strong> ${stats.stateActors}<br>
+        <strong>ONG / Associations :</strong> ${stats.oscActors}<br>
+        <strong>Types de services VBG :</strong> ${stats.servicesCount}<br>
+        <strong>Services clés :</strong> ${stats.servicesPreview.length ? stats.servicesPreview.join(", ") : "Aucun renseigné"}
+      </div>
     `;
   }
 
@@ -312,41 +373,43 @@
 
     const selectedDept = safe(deptFilter.value);
 
+    function getDeptStyle(feature){
+      const deptName = normalizeDeptName(feature.properties?.adm2_name);
+      const isTarget = departmentInScope(deptName);
+      const isSelected = selectedDept && deptName === selectedDept;
+
+      if (isSelected) {
+        return {
+          color: COLORS.selectedDept,
+          weight: 3,
+          fillColor: COLORS.selectedDept,
+          fillOpacity: 0.30
+        };
+      }
+
+      if (isTarget) {
+        return {
+          color: COLORS.targetDept,
+          weight: 2.5,
+          fillColor: COLORS.targetDept,
+          fillOpacity: 0.18
+        };
+      }
+
+      return {
+        color: COLORS.otherDept,
+        weight: 1,
+        fillColor: COLORS.otherDept,
+        fillOpacity: 0.04
+      };
+    }
+
     adminLayer = L.geoJSON(adminGeo, {
       filter: function(feature){
         return !!safe(feature.properties?.adm2_name);
       },
 
-      style: function(feature){
-        const deptName = normalizeDeptName(feature.properties?.adm2_name);
-        const isTarget = departmentInScope(deptName);
-        const isSelected = selectedDept && deptName === selectedDept;
-
-        if (isSelected) {
-          return {
-            color: COLORS.selectedDept,
-            weight: 3,
-            fillColor: COLORS.selectedDept,
-            fillOpacity: 0.30
-          };
-        }
-
-        if (isTarget) {
-          return {
-            color: COLORS.targetDept,
-            weight: 2.5,
-            fillColor: COLORS.targetDept,
-            fillOpacity: 0.18
-          };
-        }
-
-        return {
-          color: COLORS.otherDept,
-          weight: 1,
-          fillColor: COLORS.otherDept,
-          fillOpacity: 0.04
-        };
-      },
+      style: getDeptStyle,
 
       onEachFeature: function(feature, layer){
         const props = feature.properties || {};
@@ -358,6 +421,28 @@
           <b>Région :</b> ${safe(props.adm1_name)}<br>
           <b>Département ciblé :</b> ${isTarget ? "Oui" : "Non"}
         `);
+
+        layer.bindTooltip(buildDepartmentTooltip(feature), {
+          sticky: true,
+          direction: "top",
+          opacity: 0.96
+        });
+
+        layer.on("mouseover", function(){
+          this.setStyle({
+            weight: 4,
+            fillOpacity: 0.35
+          });
+        });
+
+        layer.on("mouseout", function(){
+          adminLayer.resetStyle(this);
+        });
+
+        layer.on("click", function(){
+          deptFilter.value = deptName;
+          redrawMap();
+        });
       }
     }).addTo(map);
   }
@@ -415,9 +500,7 @@
     clearDynamicLayers();
     saveFilters();
 
-    const rows = allRows
-      .filter(actorMatches)
-      .filter(r => safe(r.latitude) && safe(r.longitude));
+    const rows = getFilteredRows().filter(r => safe(r.latitude) && safe(r.longitude));
 
     if (viewMode.value === "markers") {
       actorLayer = L.layerGroup();
@@ -454,7 +537,10 @@
 
       heatLayer.addTo(map);
     }
+  }
 
+  function redrawMap(){
+    redrawActors();
     drawAdminLayer();
     drawLegend();
   }
@@ -476,7 +562,7 @@
     allRows = rows;
 
     populateFilters(allRows);
-    redrawActors();
+    redrawMap();
 
     const bounds = L.geoJSON(adminGeo).getBounds();
     if (bounds.isValid()) {
@@ -490,10 +576,10 @@
     alert("Erreur lors du chargement des données cartographiques.");
   });
 
-  actorFilter.addEventListener("change", redrawActors);
-  deptFilter.addEventListener("change", redrawActors);
-  serviceFilter.addEventListener("change", redrawActors);
-  viewMode.addEventListener("change", redrawActors);
+  actorFilter.addEventListener("change", redrawMap);
+  deptFilter.addEventListener("change", redrawMap);
+  serviceFilter.addEventListener("change", redrawMap);
+  viewMode.addEventListener("change", redrawMap);
 </script>
 
 </body>
