@@ -12,26 +12,143 @@
   <script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
 
   <style>
+    .map-page-layout{
+      display:grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap:18px;
+      align-items:start;
+    }
+
+    .map-card,
+    .side-panel{
+      background:#fff;
+      border:1px solid rgba(11,18,32,.12);
+      border-radius:14px;
+      box-shadow:0 8px 20px rgba(11,18,32,.06);
+      overflow:hidden;
+    }
+
+    .map-card{
+      padding:16px;
+    }
+
+    .side-panel{
+      padding:16px;
+      max-height:84vh;
+      overflow:auto;
+    }
+
+    #map{
+      height:76vh;
+      width:100%;
+      border-radius:12px;
+      overflow:hidden;
+    }
+
     .map-toolbar-note{
       margin: 0 0 10px;
       font-size: 13px;
       color: var(--muted);
     }
 
-    .leaflet-popup-content,
-    .leaflet-tooltip{
-      font-size: 13px;
-      line-height: 1.45;
+    .panel-title{
+      margin:0 0 8px;
+      font-size:20px;
+      color:#0b1220;
     }
 
-    .dept-tooltip{
-      min-width: 240px;
+    .panel-subtitle{
+      margin:0 0 14px;
+      font-size:13px;
+      color:#5b6b80;
     }
 
-    .dept-tooltip hr{
-      border: none;
-      border-top: 1px solid #e5e7eb;
-      margin: 8px 0;
+    .mini-kpis{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(120px,1fr));
+      gap:10px;
+      margin-bottom:16px;
+    }
+
+    .mini-kpi{
+      padding:12px;
+      border:1px solid rgba(11,18,32,.10);
+      border-radius:12px;
+      background:#f8fafc;
+    }
+
+    .mini-kpi .label{
+      font-size:12px;
+      color:#64748b;
+      margin-bottom:6px;
+    }
+
+    .mini-kpi .value{
+      font-size:22px;
+      font-weight:800;
+      color:#1f5fa8;
+    }
+
+    .panel-section{
+      margin-bottom:18px;
+    }
+
+    .panel-section h3{
+      margin:0 0 10px;
+      font-size:15px;
+      color:#0b1220;
+    }
+
+    .actor-list{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .actor-item{
+      border:1px solid rgba(11,18,32,.10);
+      border-radius:10px;
+      padding:10px 12px;
+      background:#fff;
+    }
+
+    .actor-item .name{
+      font-weight:800;
+      color:#0b1220;
+      margin-bottom:4px;
+    }
+
+    .actor-item .meta{
+      font-size:12px;
+      color:#5b6b80;
+      line-height:1.5;
+    }
+
+    .pill-wrap{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+    }
+
+    .pill{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(31,95,168,.08);
+      color:#1f5fa8;
+      border:1px solid rgba(31,95,168,.15);
+      font-size:11px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+
+    .empty-note{
+      padding:12px;
+      border:1px dashed rgba(11,18,32,.15);
+      border-radius:10px;
+      color:#64748b;
+      font-size:13px;
+      background:#fafafa;
     }
 
     .legend-box{
@@ -77,13 +194,43 @@
       box-shadow:0 0 0 1px rgba(0,0,0,.15);
       flex:0 0 auto;
     }
+
+    .leaflet-popup-content,
+    .leaflet-tooltip{
+      font-size:13px;
+      line-height:1.45;
+    }
+
+    .dept-tooltip{
+      min-width:240px;
+    }
+
+    .dept-tooltip hr{
+      border:none;
+      border-top:1px solid #e5e7eb;
+      margin:8px 0;
+    }
+
+    @media (max-width: 1100px){
+      .map-page-layout{
+        grid-template-columns:1fr;
+      }
+
+      .side-panel{
+        max-height:none;
+      }
+
+      #map{
+        height:68vh;
+      }
+    }
   </style>
 </head>
 <body>
 
 <header>
   <h1>Carte des acteurs VBG — Sénégal / Région de Kolda</h1>
-  <p>Visualisation des départements ciblés, des acteurs VBG et de la concentration des services.</p>
+  <p>Carte interactive avec panneau dynamique des chiffres clés, acteurs et services par département.</p>
 
   <div class="top-links">
     <a href="../">Accueil</a>
@@ -94,43 +241,88 @@
 </header>
 
 <div class="container">
-  <div class="card" style="padding:16px;">
-    <p class="map-toolbar-note">
-      La navigation est limitée au Sénégal. Survole un département pour voir son résumé, ou clique dessus pour filtrer la carte.
-    </p>
+  <div class="map-page-layout">
 
-    <div class="filters" style="margin-bottom:12px;">
-      <div class="filter-group">
-        <label for="actorFilter">Type d’acteur</label>
-        <select id="actorFilter">
-          <option value="">Tous</option>
-        </select>
+    <div class="map-card">
+      <p class="map-toolbar-note">
+        Clique sur un département pour afficher ses chiffres clés, ses acteurs et ses services dans le panneau de droite.
+      </p>
+
+      <div class="filters" style="margin-bottom:12px;">
+        <div class="filter-group">
+          <label for="actorFilter">Type d’acteur</label>
+          <select id="actorFilter">
+            <option value="">Tous</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="deptFilter">Département</label>
+          <select id="deptFilter">
+            <option value="">Tous</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="serviceFilter">Type de service VBG</label>
+          <select id="serviceFilter">
+            <option value="">Tous</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="viewMode">Affichage</label>
+          <select id="viewMode">
+            <option value="markers">Points acteurs</option>
+            <option value="heatmap">Heatmap services</option>
+          </select>
+        </div>
       </div>
 
-      <div class="filter-group">
-        <label for="deptFilter">Département</label>
-        <select id="deptFilter">
-          <option value="">Tous</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label for="serviceFilter">Type de service VBG</label>
-        <select id="serviceFilter">
-          <option value="">Tous</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label for="viewMode">Affichage</label>
-        <select id="viewMode">
-          <option value="markers">Points acteurs</option>
-          <option value="heatmap">Heatmap services</option>
-        </select>
-      </div>
+      <div id="map"></div>
     </div>
 
-    <div id="map"></div>
+    <aside class="side-panel">
+      <h2 class="panel-title" id="panelDeptTitle">Vue générale</h2>
+      <p class="panel-subtitle" id="panelDeptSubtitle">
+        Sélectionne un département sur la carte pour afficher le résumé détaillé.
+      </p>
+
+      <div class="mini-kpis">
+        <div class="mini-kpi">
+          <div class="label">Acteurs</div>
+          <div class="value" id="statActors">0</div>
+        </div>
+        <div class="mini-kpi">
+          <div class="label">Services étatiques</div>
+          <div class="value" id="statState">0</div>
+        </div>
+        <div class="mini-kpi">
+          <div class="label">ONG / Associations</div>
+          <div class="value" id="statOsc">0</div>
+        </div>
+        <div class="mini-kpi">
+          <div class="label">Types de services</div>
+          <div class="value" id="statServices">0</div>
+        </div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Services disponibles</h3>
+        <div class="pill-wrap" id="servicesList"></div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Liste des acteurs</h3>
+        <div class="actor-list" id="actorsList"></div>
+      </div>
+
+      <div class="panel-section">
+        <h3>Principaux gaps</h3>
+        <div class="pill-wrap" id="gapsList"></div>
+      </div>
+    </aside>
+
   </div>
 </div>
 
@@ -165,6 +357,16 @@
   const serviceFilter = document.getElementById("serviceFilter");
   const viewMode = document.getElementById("viewMode");
 
+  const panelDeptTitle = document.getElementById("panelDeptTitle");
+  const panelDeptSubtitle = document.getElementById("panelDeptSubtitle");
+  const statActors = document.getElementById("statActors");
+  const statState = document.getElementById("statState");
+  const statOsc = document.getElementById("statOsc");
+  const statServices = document.getElementById("statServices");
+  const servicesList = document.getElementById("servicesList");
+  const actorsList = document.getElementById("actorsList");
+  const gapsList = document.getElementById("gapsList");
+
   const senegalBounds = L.latLngBounds(
     [12.0, -17.7],
     [16.9, -11.0]
@@ -174,8 +376,7 @@
     maxBounds: senegalBounds,
     maxBoundsViscosity: 1.0,
     minZoom: 7,
-    maxZoom: 12,
-    zoomControl: true
+    maxZoom: 12
   }).setView([14.4, -14.4], 7);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -189,10 +390,7 @@
   }
 
   function splitValues(value){
-    return safe(value)
-      .split(";")
-      .map(v => v.trim())
-      .filter(Boolean);
+    return safe(value).split(";").map(v => v.trim()).filter(Boolean);
   }
 
   function uniqueSorted(values){
@@ -228,6 +426,19 @@
 
   function departmentInScope(name){
     return TARGET_DEPARTMENTS.includes(normalizeDeptName(name));
+  }
+
+  function classifyGap(text){
+    const t = safe(text).toLowerCase();
+
+    if (t.includes("financement") || t.includes("budget") || t.includes("ressources financières")) return "Financement";
+    if (t.includes("logistique") || t.includes("déplacement") || t.includes("transport")) return "Logistique";
+    if (t.includes("ressources humaines") || t.includes("personnel") || t.includes("rh")) return "Ressources humaines";
+    if (t.includes("résistance") || t.includes("socioculturel") || t.includes("normes")) return "Contraintes socioculturelles";
+    if (t.includes("hébergement") || t.includes("locaux") || t.includes("infrastructure")) return "Infrastructure / accueil";
+    if (t.includes("coordination") || t.includes("chevauchement")) return "Coordination";
+    if (t.includes("médicament") || t.includes("médicale") || t.includes("médical")) return "Capacité technique / intrants";
+    return "Autres";
   }
 
   function saveFilters(){
@@ -291,36 +502,75 @@
     return allRows.filter(actorMatches);
   }
 
+  function getDepartmentRows(deptName){
+    const normalizedDept = normalizeDeptName(deptName);
+    return getFilteredRows().filter(r => {
+      const rowDepts = splitValues(r["departement(s)"]).map(normalizeDeptName);
+      return rowDepts.includes(normalizedDept);
+    });
+  }
+
   function buildPopup(row){
     return `
       <strong>${safe(row.structure)}</strong><br>
       <b>Type d’acteur :</b> ${safe(row.actor_type)}<br>
       <b>Services VBG :</b> ${safe(row.service_gbv_type)}<br>
-      <b>Domaines :</b> ${safe(row.service_domains)}<br>
       <b>Département(s) :</b> ${safe(row["departement(s)"])}<br>
       <b>Commune(s) :</b> ${safe(row["commune(s)"])}<br>
-      <b>Couverture :</b> ${safe(row.coverage_level)}<br>
-      <b>Contact :</b> ${safe(row.contact_name)}<br>
-      <b>Téléphone :</b> ${safe(row.phone)}<br>
-      <b>Email :</b> ${safe(row.email)}
+      <b>Couverture :</b> ${safe(row.coverage_level)}
     `;
   }
 
-  function getDepartmentStats(deptName){
-    const normalizedDept = normalizeDeptName(deptName);
+  function renderPanel(deptName = ""){
+    const rows = deptName ? getDepartmentRows(deptName) : getFilteredRows();
 
-    const rows = getFilteredRows().filter(r => {
-      const rowDepts = splitValues(r["departement(s)"]).map(normalizeDeptName);
-      return rowDepts.includes(normalizedDept);
-    });
+    panelDeptTitle.textContent = deptName ? deptName : "Vue générale";
+    panelDeptSubtitle.textContent = deptName
+      ? "Résumé des structures, services et contraintes pour le département sélectionné."
+      : "Résumé global selon les filtres actuellement appliqués.";
 
     const totalActors = rows.length;
     const stateActors = rows.filter(r => isStateActor(r.actor_type)).length;
     const oscActors = totalActors - stateActors;
+    const services = uniqueSorted(rows.flatMap(r => splitValues(r.service_gbv_type)));
+    const gaps = uniqueSorted(rows.map(r => classifyGap(r.gaps)).filter(Boolean));
 
-    const services = [...new Set(
-      rows.flatMap(r => splitValues(r.service_gbv_type))
-    )];
+    statActors.textContent = totalActors;
+    statState.textContent = stateActors;
+    statOsc.textContent = oscActors;
+    statServices.textContent = services.length;
+
+    servicesList.innerHTML = services.length
+      ? services.map(s => `<span class="pill">${s}</span>`).join("")
+      : `<div class="empty-note">Aucun service renseigné pour la sélection actuelle.</div>`;
+
+    gapsList.innerHTML = gaps.length
+      ? gaps.map(g => `<span class="pill">${g}</span>`).join("")
+      : `<div class="empty-note">Aucun gap renseigné pour la sélection actuelle.</div>`;
+
+    if (!rows.length) {
+      actorsList.innerHTML = `<div class="empty-note">Aucun acteur correspondant aux filtres appliqués.</div>`;
+      return;
+    }
+
+    actorsList.innerHTML = rows.map(r => `
+      <div class="actor-item">
+        <div class="name">${safe(r.structure)}</div>
+        <div class="meta">
+          <strong>Type :</strong> ${safe(r.actor_type)}<br>
+          <strong>Services :</strong> ${safe(r.service_gbv_type)}<br>
+          <strong>Couverture :</strong> ${safe(r.coverage_level)}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function getDepartmentStats(deptName){
+    const rows = getDepartmentRows(deptName);
+    const totalActors = rows.length;
+    const stateActors = rows.filter(r => isStateActor(r.actor_type)).length;
+    const oscActors = totalActors - stateActors;
+    const services = uniqueSorted(rows.flatMap(r => splitValues(r.service_gbv_type)));
 
     return {
       totalActors,
@@ -408,9 +658,7 @@
       filter: function(feature){
         return !!safe(feature.properties?.adm2_name);
       },
-
       style: getDeptStyle,
-
       onEachFeature: function(feature, layer){
         const props = feature.properties || {};
         const deptName = normalizeDeptName(props.adm2_name);
@@ -442,6 +690,7 @@
         layer.on("click", function(){
           deptFilter.value = deptName;
           redrawMap();
+          renderPanel(deptName);
         });
       }
     }).addTo(map);
@@ -543,6 +792,7 @@
     redrawActors();
     drawAdminLayer();
     drawLegend();
+    renderPanel(safe(deptFilter.value));
   }
 
   Promise.all([
