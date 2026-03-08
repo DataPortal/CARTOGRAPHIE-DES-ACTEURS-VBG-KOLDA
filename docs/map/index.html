@@ -10,46 +10,109 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
+
+  <style>
+    .map-toolbar-note{
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .leaflet-popup-content{
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .legend-box{
+      background:#fff;
+      border:1px solid rgba(11,18,32,.12);
+      border-radius:12px;
+      box-shadow:0 8px 20px rgba(11,18,32,.06);
+      padding:10px 12px;
+      line-height:1.45;
+      min-width:240px;
+    }
+
+    .legend-title{
+      font-weight:800;
+      margin-bottom:8px;
+      color:#0b1220;
+    }
+
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin:6px 0;
+      font-size:12px;
+      color:#0b1220;
+    }
+
+    .legend-swatch{
+      width:14px;
+      height:14px;
+      border-radius:3px;
+      border:1px solid rgba(0,0,0,.15);
+      display:inline-block;
+      flex:0 0 auto;
+    }
+
+    .legend-dot{
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      display:inline-block;
+      border:2px solid #fff;
+      box-shadow:0 0 0 1px rgba(0,0,0,.15);
+      flex:0 0 auto;
+    }
+  </style>
 </head>
 <body>
 
 <header>
   <h1>Carte des acteurs VBG — Sénégal / Région de Kolda</h1>
-  <p>Sénégal en contexte, départements concernés mis en évidence, points acteurs et heatmap.</p>
+  <p>Visualisation des départements ciblés, des acteurs VBG et de la concentration des services.</p>
 
   <div class="top-links">
     <a href="../">Accueil</a>
     <a href="../table/">Base de données</a>
     <a href="../analysis/">Analyse</a>
+    <a href="../data/actors_vbg_kolda_geo_ready.csv">Télécharger le CSV</a>
   </div>
 </header>
 
 <div class="container">
   <div class="card" style="padding:16px;">
+    <p class="map-toolbar-note">
+      La navigation est limitée au Sénégal. Les départements de <strong>Kolda</strong>, <strong>Vélingara</strong> et
+      <strong>Médina Yoro Foulah</strong> sont mis en évidence.
+    </p>
+
     <div class="filters" style="margin-bottom:12px;">
       <div class="filter-group">
-        <label>Type d’acteur</label>
+        <label for="actorFilter">Type d’acteur</label>
         <select id="actorFilter">
           <option value="">Tous</option>
         </select>
       </div>
 
       <div class="filter-group">
-        <label>Département</label>
+        <label for="deptFilter">Département</label>
         <select id="deptFilter">
           <option value="">Tous</option>
         </select>
       </div>
 
       <div class="filter-group">
-        <label>Type de service VBG</label>
+        <label for="serviceFilter">Type de service VBG</label>
         <select id="serviceFilter">
           <option value="">Tous</option>
         </select>
       </div>
 
       <div class="filter-group">
-        <label>Affichage</label>
+        <label for="viewMode">Affichage</label>
         <select id="viewMode">
           <option value="markers">Points acteurs</option>
           <option value="heatmap">Heatmap services</option>
@@ -62,265 +125,375 @@
 </div>
 
 <script>
-const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
-const ADMIN_URL = "../data/sen_admin2_em.json";
+  const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
+  const ADMIN_URL = "../data/sen_admin2_em.json";
 
-const COLORS = {
-  state: "#1f5fa8",
-  osc: "#f58220",
-  selectedDept: "#c94f4f",
-  regionHighlight: "#1f8f6a",
-  otherDept: "#b8c4d4"
-};
-
-let allRows = [];
-let adminGeo = null;
-let actorLayer = null;
-let heatLayer = null;
-let adminLayer = null;
-let legendControl = null;
-
-const actorFilter = document.getElementById("actorFilter");
-const deptFilter = document.getElementById("deptFilter");
-const serviceFilter = document.getElementById("serviceFilter");
-const viewMode = document.getElementById("viewMode");
-
-const map = L.map("map").setView([14.4, -14.4], 7);
-
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap contributors"
-}).addTo(map);
-
-function safe(v){ return (v ?? "").toString().trim(); }
-
-function splitValues(value){
-  return safe(value).split(";").map(v => v.trim()).filter(Boolean);
-}
-
-function uniqueSorted(values){
-  return [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b, "fr"));
-}
-
-function normalizeDeptName(name){
-  const n = safe(name).toLowerCase();
-  if (n === "médina yorofoulah" || n === "medina yorofoula" || n === "médina-yorofoula" || n === "medina-yorofoula" || n === "médina yoro foulah") {
-    return "Médina Yoro Foulah";
-  }
-  if (n === "velingara") return "Vélingara";
-  if (n === "kolda") return "Kolda";
-  return safe(name);
-}
-
-function isStateActor(type){
-  return safe(type).toLowerCase().includes("étatique");
-}
-
-function pointColor(actorType){
-  return isStateActor(actorType) ? COLORS.state : COLORS.osc;
-}
-
-function saveFilters(){
-  const filters = {
-    actor: actorFilter.value,
-    dept: deptFilter.value,
-    service: serviceFilter.value
+  const COLORS = {
+    state: "#1f5fa8",
+    osc: "#f58220",
+    selectedDept: "#c94f4f",
+    targetDept: "#1f8f6a",
+    otherDept: "#cbd5e1",
+    outline: "#ffffff"
   };
-  localStorage.setItem("vbg_kolda_filters", JSON.stringify(filters));
-}
 
-function loadFilters(){
-  try{
-    const raw = localStorage.getItem("vbg_kolda_filters");
-    if(!raw) return;
-    const f = JSON.parse(raw);
-    if (f.actor) actorFilter.value = f.actor;
-    if (f.dept) deptFilter.value = f.dept;
-    if (f.service) serviceFilter.value = f.service;
-  }catch(e){}
-}
+  const TARGET_DEPARTMENTS = [
+    "Kolda",
+    "Vélingara",
+    "Médina Yoro Foulah"
+  ];
 
-function populateFilters(rows){
-  const actorTypes = uniqueSorted(rows.map(r => safe(r.actor_type)));
-  const departments = uniqueSorted(rows.flatMap(r => splitValues(r["departement(s)"]).map(normalizeDeptName)));
-  const services = uniqueSorted(rows.flatMap(r => splitValues(r.service_gbv_type)));
+  let allRows = [];
+  let adminGeo = null;
+  let actorLayer = null;
+  let heatLayer = null;
+  let adminLayer = null;
+  let legendControl = null;
 
-  actorFilter.innerHTML = `<option value="">Tous</option>` + actorTypes.map(t => `<option value="${t}">${t}</option>`).join("");
-  deptFilter.innerHTML = `<option value="">Tous</option>` + departments.map(d => `<option value="${d}">${d}</option>`).join("");
-  serviceFilter.innerHTML = `<option value="">Tous</option>` + services.map(s => `<option value="${s}">${s}</option>`).join("");
+  const actorFilter = document.getElementById("actorFilter");
+  const deptFilter = document.getElementById("deptFilter");
+  const serviceFilter = document.getElementById("serviceFilter");
+  const viewMode = document.getElementById("viewMode");
 
-  loadFilters();
-}
+  const senegalBounds = L.latLngBounds(
+    [12.0, -17.7],
+    [16.9, -11.0]
+  );
 
-function actorMatches(row){
-  const actor = safe(actorFilter.value);
-  const dept = safe(deptFilter.value);
-  const service = safe(serviceFilter.value);
+  const map = L.map("map", {
+    maxBounds: senegalBounds,
+    maxBoundsViscosity: 1.0,
+    minZoom: 7,
+    maxZoom: 12,
+    zoomControl: true
+  }).setView([14.4, -14.4], 7);
 
-  const actorOk = !actor || safe(row.actor_type) === actor;
-  const rowDepts = splitValues(row["departement(s)"]).map(normalizeDeptName);
-  const deptOk = !dept || rowDepts.includes(dept);
-  const serviceOk = !service || splitValues(row.service_gbv_type).includes(service);
-
-  return actorOk && deptOk && serviceOk;
-}
-
-function buildPopup(r){
-  return `
-    <strong>${safe(r.structure)}</strong><br>
-    <b>Type :</b> ${safe(r.actor_type)}<br>
-    <b>Services :</b> ${safe(r.service_gbv_type)}<br>
-    <b>Domaines :</b> ${safe(r.service_domains)}<br>
-    <b>Département(s) :</b> ${safe(r["departement(s)"])}<br>
-    <b>Commune(s) :</b> ${safe(r["commune(s)"])}<br>
-    <b>Contact :</b> ${safe(r.contact_name)}<br>
-    <b>Téléphone :</b> ${safe(r.phone)}<br>
-    <b>Email :</b> ${safe(r.email)}
-  `;
-}
-
-function clearDynamicLayers(){
-  if (actorLayer) map.removeLayer(actorLayer);
-  if (heatLayer) map.removeLayer(heatLayer);
-}
-
-function departmentInScope(name){
-  const n = normalizeDeptName(name);
-  return ["Kolda", "Vélingara", "Médina Yoro Foulah"].includes(n);
-}
-
-function drawAdminLayer(){
-  if (adminLayer) map.removeLayer(adminLayer);
-
-  const selectedDept = safe(deptFilter.value);
-
-  adminLayer = L.geoJSON(adminGeo, {
-    style: function(feature){
-      const deptName = normalizeDeptName(feature.properties?.adm2_name);
-      const inScope = departmentInScope(deptName);
-      const isSelected = selectedDept && deptName === selectedDept;
-
-      if (isSelected) {
-        return {
-          color: COLORS.selectedDept,
-          weight: 3,
-          fillColor: COLORS.selectedDept,
-          fillOpacity: 0.30
-        };
-      }
-
-      if (inScope) {
-        return {
-          color: COLORS.regionHighlight,
-          weight: 2.5,
-          fillColor: COLORS.regionHighlight,
-          fillOpacity: 0.18
-        };
-      }
-
-      return {
-        color: COLORS.otherDept,
-        weight: 1,
-        fillColor: COLORS.otherDept,
-        fillOpacity: 0.04
-      };
-    },
-    onEachFeature: function(feature, layer){
-      const p = feature.properties || {};
-      const deptName = normalizeDeptName(p.adm2_name);
-      const inScope = departmentInScope(deptName);
-      layer.bindPopup(`
-        <strong>${deptName}</strong><br>
-        <b>Région :</b> ${safe(p.adm1_name)}<br>
-        <b>Département ciblé :</b> ${inScope ? "Oui" : "Non"}
-      `);
-    }
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
-}
 
-function drawLegend(){
-  if (legendControl) map.removeControl(legendControl);
+  map.fitBounds(senegalBounds);
 
-  legendControl = L.control({ position: "bottomright" });
-
-  legendControl.onAdd = function(){
-    const div = L.DomUtil.create("div", "legend-box");
-    div.innerHTML = `
-      <div class="legend-title">Légende</div>
-      <div class="legend-item"><span class="legend-swatch" style="background:${COLORS.regionHighlight};"></span> Départements ciblés (Kolda, Vélingara, Médina Yoro Foulah)</div>
-      <div class="legend-item"><span class="legend-swatch" style="background:${COLORS.selectedDept};"></span> Département filtré</div>
-      <div class="legend-item"><span class="legend-swatch" style="background:${COLORS.otherDept};"></span> Autres départements du Sénégal</div>
-      <div class="legend-item"><span class="legend-dot" style="background:${COLORS.state};"></span> Service étatique</div>
-      <div class="legend-item"><span class="legend-dot" style="background:${COLORS.osc};"></span> ONG / Association</div>
-      <div class="legend-item"><span class="legend-swatch" style="background:linear-gradient(90deg,#2b83ba,#abdda4,#fdae61,#d7191c);"></span> Heatmap concentration services</div>
-    `;
-    return div;
-  };
-
-  legendControl.addTo(map);
-}
-
-function redrawActors(){
-  clearDynamicLayers();
-  saveFilters();
-
-  const rows = allRows.filter(actorMatches).filter(r => safe(r.latitude) && safe(r.longitude));
-
-  if (viewMode.value === "markers") {
-    actorLayer = L.layerGroup();
-
-    rows.forEach(r => {
-      const lat = parseFloat(r.latitude);
-      const lon = parseFloat(r.longitude);
-      const color = pointColor(r.actor_type);
-
-      const marker = L.circleMarker([lat, lon], {
-        radius: 7,
-        color: "#ffffff",
-        weight: 2,
-        fillColor: color,
-        fillOpacity: 0.95
-      }).bindPopup(buildPopup(r));
-
-      actorLayer.addLayer(marker);
-    });
-
-    actorLayer.addTo(map);
-  } else {
-    const pts = rows.map(r => [parseFloat(r.latitude), parseFloat(r.longitude), 0.9]);
-    heatLayer = L.heatLayer(pts, { radius: 28, blur: 18, maxZoom: 12 });
-    heatLayer.addTo(map);
+  function safe(v){
+    return (v ?? "").toString().trim();
   }
 
-  drawAdminLayer();
-  drawLegend();
-}
+  function splitValues(value){
+    return safe(value)
+      .split(";")
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
 
-Promise.all([
-  fetch(ADMIN_URL).then(r => r.json()),
-  new Promise((resolve, reject) => {
-    Papa.parse(CSV_URL, {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: res => resolve(res.data || []),
-      error: reject
-    });
+  function uniqueSorted(values){
+    return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, "fr"));
+  }
+
+  function normalizeDeptName(name){
+    const n = safe(name).toLowerCase();
+
+    if (
+      n === "médina yorofoulah" ||
+      n === "medina yorofoula" ||
+      n === "médina-yorofoula" ||
+      n === "medina-yorofoula" ||
+      n === "médina yoro foulah"
+    ) {
+      return "Médina Yoro Foulah";
+    }
+
+    if (n === "velingara") return "Vélingara";
+    if (n === "kolda") return "Kolda";
+
+    return safe(name);
+  }
+
+  function isStateActor(type){
+    return safe(type).toLowerCase().includes("étatique");
+  }
+
+  function pointColor(actorType){
+    return isStateActor(actorType) ? COLORS.state : COLORS.osc;
+  }
+
+  function departmentInScope(name){
+    return TARGET_DEPARTMENTS.includes(normalizeDeptName(name));
+  }
+
+  function saveFilters(){
+    const filters = {
+      actor: actorFilter.value,
+      dept: deptFilter.value,
+      service: serviceFilter.value
+    };
+    localStorage.setItem("vbg_kolda_filters", JSON.stringify(filters));
+  }
+
+  function loadFilters(){
+    try{
+      const raw = localStorage.getItem("vbg_kolda_filters");
+      if(!raw) return;
+      const filters = JSON.parse(raw);
+      if (filters.actor) actorFilter.value = filters.actor;
+      if (filters.dept) deptFilter.value = filters.dept;
+      if (filters.service) serviceFilter.value = filters.service;
+    } catch(e){}
+  }
+
+  function populateFilters(rows){
+    const actorTypes = uniqueSorted(rows.map(r => safe(r.actor_type)));
+    const departments = uniqueSorted(
+      rows.flatMap(r => splitValues(r["departement(s)"]).map(normalizeDeptName))
+    );
+    const services = uniqueSorted(
+      rows.flatMap(r => splitValues(r.service_gbv_type))
+    );
+
+    actorFilter.innerHTML =
+      `<option value="">Tous</option>` +
+      actorTypes.map(t => `<option value="${t}">${t}</option>`).join("");
+
+    deptFilter.innerHTML =
+      `<option value="">Tous</option>` +
+      departments.map(d => `<option value="${d}">${d}</option>`).join("");
+
+    serviceFilter.innerHTML =
+      `<option value="">Tous</option>` +
+      services.map(s => `<option value="${s}">${s}</option>`).join("");
+
+    loadFilters();
+  }
+
+  function actorMatches(row){
+    const actor = safe(actorFilter.value);
+    const dept = safe(deptFilter.value);
+    const service = safe(serviceFilter.value);
+
+    const actorOk = !actor || safe(row.actor_type) === actor;
+    const rowDepts = splitValues(row["departement(s)"]).map(normalizeDeptName);
+    const deptOk = !dept || rowDepts.includes(dept);
+    const serviceOk = !service || splitValues(row.service_gbv_type).includes(service);
+
+    return actorOk && deptOk && serviceOk;
+  }
+
+  function buildPopup(row){
+    return `
+      <strong>${safe(row.structure)}</strong><br>
+      <b>Type d’acteur :</b> ${safe(row.actor_type)}<br>
+      <b>Services VBG :</b> ${safe(row.service_gbv_type)}<br>
+      <b>Domaines :</b> ${safe(row.service_domains)}<br>
+      <b>Département(s) :</b> ${safe(row["departement(s)"])}<br>
+      <b>Commune(s) :</b> ${safe(row["commune(s)"])}<br>
+      <b>Couverture :</b> ${safe(row.coverage_level)}<br>
+      <b>Contact :</b> ${safe(row.contact_name)}<br>
+      <b>Téléphone :</b> ${safe(row.phone)}<br>
+      <b>Email :</b> ${safe(row.email)}
+    `;
+  }
+
+  function clearDynamicLayers(){
+    if (actorLayer) {
+      map.removeLayer(actorLayer);
+      actorLayer = null;
+    }
+
+    if (heatLayer) {
+      map.removeLayer(heatLayer);
+      heatLayer = null;
+    }
+  }
+
+  function drawAdminLayer(){
+    if (adminLayer) {
+      map.removeLayer(adminLayer);
+      adminLayer = null;
+    }
+
+    const selectedDept = safe(deptFilter.value);
+
+    adminLayer = L.geoJSON(adminGeo, {
+      filter: function(feature){
+        return !!safe(feature.properties?.adm2_name);
+      },
+
+      style: function(feature){
+        const deptName = normalizeDeptName(feature.properties?.adm2_name);
+        const isTarget = departmentInScope(deptName);
+        const isSelected = selectedDept && deptName === selectedDept;
+
+        if (isSelected) {
+          return {
+            color: COLORS.selectedDept,
+            weight: 3,
+            fillColor: COLORS.selectedDept,
+            fillOpacity: 0.30
+          };
+        }
+
+        if (isTarget) {
+          return {
+            color: COLORS.targetDept,
+            weight: 2.5,
+            fillColor: COLORS.targetDept,
+            fillOpacity: 0.18
+          };
+        }
+
+        return {
+          color: COLORS.otherDept,
+          weight: 1,
+          fillColor: COLORS.otherDept,
+          fillOpacity: 0.04
+        };
+      },
+
+      onEachFeature: function(feature, layer){
+        const props = feature.properties || {};
+        const deptName = normalizeDeptName(props.adm2_name);
+        const isTarget = departmentInScope(deptName);
+
+        layer.bindPopup(`
+          <strong>${deptName}</strong><br>
+          <b>Région :</b> ${safe(props.adm1_name)}<br>
+          <b>Département ciblé :</b> ${isTarget ? "Oui" : "Non"}
+        `);
+      }
+    }).addTo(map);
+  }
+
+  function drawLegend(){
+    if (legendControl) {
+      map.removeControl(legendControl);
+      legendControl = null;
+    }
+
+    legendControl = L.control({ position: "bottomright" });
+
+    legendControl.onAdd = function(){
+      const div = L.DomUtil.create("div", "legend-box");
+      div.innerHTML = `
+        <div class="legend-title">Légende cartographique</div>
+
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:${COLORS.targetDept};"></span>
+          Départements ciblés
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:${COLORS.selectedDept};"></span>
+          Département filtré
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:${COLORS.otherDept};"></span>
+          Autres départements du Sénégal
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-dot" style="background:${COLORS.state};"></span>
+          Service étatique
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-dot" style="background:${COLORS.osc};"></span>
+          ONG / Association
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-swatch" style="background:linear-gradient(90deg,#2b83ba,#abdda4,#fdae61,#d7191c);"></span>
+          Heatmap des services
+        </div>
+      `;
+      return div;
+    };
+
+    legendControl.addTo(map);
+  }
+
+  function redrawActors(){
+    clearDynamicLayers();
+    saveFilters();
+
+    const rows = allRows
+      .filter(actorMatches)
+      .filter(r => safe(r.latitude) && safe(r.longitude));
+
+    if (viewMode.value === "markers") {
+      actorLayer = L.layerGroup();
+
+      rows.forEach(row => {
+        const lat = parseFloat(row.latitude);
+        const lon = parseFloat(row.longitude);
+        const color = pointColor(row.actor_type);
+
+        const marker = L.circleMarker([lat, lon], {
+          radius: 7,
+          color: COLORS.outline,
+          weight: 2,
+          fillColor: color,
+          fillOpacity: 0.95
+        }).bindPopup(buildPopup(row));
+
+        actorLayer.addLayer(marker);
+      });
+
+      actorLayer.addTo(map);
+    } else {
+      const points = rows.map(row => [
+        parseFloat(row.latitude),
+        parseFloat(row.longitude),
+        0.9
+      ]);
+
+      heatLayer = L.heatLayer(points, {
+        radius: 28,
+        blur: 18,
+        maxZoom: 12
+      });
+
+      heatLayer.addTo(map);
+    }
+
+    drawAdminLayer();
+    drawLegend();
+  }
+
+  Promise.all([
+    fetch(ADMIN_URL).then(r => r.json()),
+    new Promise((resolve, reject) => {
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: res => resolve(res.data || []),
+        error: reject
+      });
+    })
+  ])
+  .then(([geo, rows]) => {
+    adminGeo = geo;
+    allRows = rows;
+
+    populateFilters(allRows);
+    redrawActors();
+
+    const bounds = L.geoJSON(adminGeo).getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds);
+    } else {
+      map.fitBounds(senegalBounds);
+    }
   })
-]).then(([geo, rows]) => {
-  adminGeo = geo;
-  allRows = rows;
+  .catch(err => {
+    console.error(err);
+    alert("Erreur lors du chargement des données cartographiques.");
+  });
 
-  populateFilters(allRows);
-  redrawActors();
-
-  const bounds = L.geoJSON(adminGeo).getBounds();
-  if (bounds.isValid()) map.fitBounds(bounds);
-});
-
-actorFilter.addEventListener("change", redrawActors);
-deptFilter.addEventListener("change", redrawActors);
-serviceFilter.addEventListener("change", redrawActors);
-viewMode.addEventListener("change", redrawActors);
+  actorFilter.addEventListener("change", redrawActors);
+  deptFilter.addEventListener("change", redrawActors);
+  serviceFilter.addEventListener("change", redrawActors);
+  viewMode.addEventListener("change", redrawActors);
 </script>
 
 </body>
