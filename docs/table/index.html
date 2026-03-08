@@ -1,157 +1,483 @@
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Table des acteurs VBG</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Table des acteurs VBG — Kolda</title>
 
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-<style>
+  <style>
+    :root{
+      --bg:#f6f8fb;
+      --card:#ffffff;
+      --ink:#0b1220;
+      --muted:#5b6b80;
+      --line:rgba(11,18,32,.12);
+      --blue:#1f5fa8;
+      --orange:#f58220;
+    }
 
-body{
-font-family:Segoe UI,Arial;
-margin:0;
-background:#f6f8fb;
-}
+    *{ box-sizing:border-box; }
 
-header{
-background:#1f5fa8;
-color:white;
-padding:20px;
-text-align:center;
-}
+    body{
+      margin:0;
+      font-family:Segoe UI, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--ink);
+    }
 
-.container{
-padding:20px;
-}
+    header{
+      background:var(--blue);
+      color:white;
+      padding:18px 20px;
+    }
 
-table{
-width:100%;
-border-collapse:collapse;
-background:white;
-}
+    header h1{
+      margin:0 0 6px;
+      font-size:24px;
+    }
 
-th{
-background:#1f5fa8;
-color:white;
-padding:10px;
-text-align:left;
-}
+    header p{
+      margin:0;
+      font-size:14px;
+      opacity:.95;
+    }
 
-td{
-padding:10px;
-border-bottom:1px solid #ddd;
-}
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    }
 
-tr:nth-child(even){
-background:#f2f2f2;
-}
+    .top-actions a{
+      display:inline-block;
+      padding:9px 12px;
+      border-radius:8px;
+      background:white;
+      color:var(--blue);
+      text-decoration:none;
+      font-weight:600;
+    }
 
-input{
-padding:8px;
-margin-bottom:15px;
-width:300px;
-}
+    .container{
+      max-width:1600px;
+      margin:0 auto;
+      padding:18px;
+    }
 
-</style>
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:14px;
+      box-shadow:0 8px 18px rgba(11,18,32,.06);
+      overflow:hidden;
+    }
+
+    .filters{
+      padding:16px;
+      border-bottom:1px solid var(--line);
+      display:grid;
+      grid-template-columns:repeat(6, minmax(180px, 1fr));
+      gap:12px;
+    }
+
+    .filter-group{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+
+    .filter-group label{
+      font-size:12px;
+      font-weight:700;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.03em;
+    }
+
+    .filter-group input,
+    .filter-group select{
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:#fff;
+      font-size:14px;
+      width:100%;
+    }
+
+    .meta{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      font-size:13px;
+      color:var(--muted);
+      background:#fbfcfe;
+    }
+
+    .btn-reset{
+      padding:9px 12px;
+      border:none;
+      border-radius:8px;
+      background:var(--orange);
+      color:white;
+      font-weight:700;
+      cursor:pointer;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      max-height:75vh;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:2200px;
+      background:white;
+    }
+
+    thead th{
+      position:sticky;
+      top:0;
+      z-index:2;
+      background:var(--blue);
+      color:white;
+      text-align:left;
+      padding:10px;
+      font-size:13px;
+      border-right:1px solid rgba(255,255,255,.15);
+      white-space:nowrap;
+    }
+
+    tbody td{
+      padding:10px;
+      font-size:13px;
+      vertical-align:top;
+      border-bottom:1px solid var(--line);
+      border-right:1px solid var(--line);
+      line-height:1.4;
+    }
+
+    tbody tr:nth-child(even){
+      background:#fafbfc;
+    }
+
+    tbody tr:hover{
+      background:#f1f6fb;
+    }
+
+    .pill{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(31,95,168,.08);
+      color:var(--blue);
+      border:1px solid rgba(31,95,168,.15);
+      font-size:11px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+
+    .empty{
+      text-align:center;
+      padding:30px;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .small{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    @media (max-width: 1200px){
+      .filters{
+        grid-template-columns:repeat(2, minmax(180px, 1fr));
+      }
+    }
+
+    @media (max-width: 700px){
+      .filters{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
 </head>
-
 <body>
 
 <header>
-<h1>Base de données des acteurs VBG</h1>
-<a href="../" style="color:white;">Retour accueil</a>
+  <h1>Base de données des acteurs VBG — Région de Kolda</h1>
+  <p>Consultation tabulaire complète des structures intervenant dans la prévention et la prise en charge des VBG.</p>
+
+  <div class="top-actions">
+    <a href="../">Accueil</a>
+    <a href="../map/">Carte interactive</a>
+    <a href="../data/actors_vbg_kolda_geo_ready.csv">Télécharger le CSV</a>
+  </div>
 </header>
 
 <div class="container">
+  <div class="card">
 
-<input type="text" id="search" placeholder="Rechercher une structure...">
+    <div class="filters">
+      <div class="filter-group">
+        <label for="searchInput">Recherche globale</label>
+        <input type="text" id="searchInput" placeholder="Structure, service, contact, adresse...">
+      </div>
 
-<table id="dataTable">
-<thead>
-<tr>
-<th>ID</th>
-<th>Type acteur</th>
-<th>Structure</th>
-<th>Services</th>
-<th>Groupes cibles</th>
-<th>Départements</th>
-<th>Téléphone</th>
-<th>Email</th>
-</tr>
-</thead>
+      <div class="filter-group">
+        <label for="actorFilter">Type d’acteur</label>
+        <select id="actorFilter">
+          <option value="">Tous</option>
+        </select>
+      </div>
 
-<tbody id="tableBody">
-</tbody>
+      <div class="filter-group">
+        <label for="deptFilter">Département</label>
+        <select id="deptFilter">
+          <option value="">Tous</option>
+        </select>
+      </div>
 
-</table>
+      <div class="filter-group">
+        <label for="communeFilter">Commune</label>
+        <select id="communeFilter">
+          <option value="">Toutes</option>
+        </select>
+      </div>
 
+      <div class="filter-group">
+        <label for="coverageFilter">Niveau de couverture</label>
+        <select id="coverageFilter">
+          <option value="">Tous</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="serviceFilter">Type de service VBG</label>
+        <select id="serviceFilter">
+          <option value="">Tous</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="meta">
+      <div id="countInfo">Chargement des données…</div>
+      <button class="btn-reset" id="resetBtn">Réinitialiser les filtres</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Type d’acteur</th>
+            <th>Structure</th>
+            <th>Domaines d’intervention / services</th>
+            <th>Type de service VBG</th>
+            <th>Groupes cibles</th>
+            <th>Région</th>
+            <th>Département(s)</th>
+            <th>Commune(s)</th>
+            <th>Niveau de couverture</th>
+            <th>Forces</th>
+            <th>Gaps / limites</th>
+            <th>Nom du contact</th>
+            <th>Fonction</th>
+            <th>Téléphone</th>
+            <th>Email</th>
+            <th>Adresse</th>
+            <th>Latitude</th>
+            <th>Longitude</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr>
+            <td colspan="20" class="empty">Chargement…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
 </div>
 
 <script>
+  const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
 
-const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
+  let allRows = [];
 
-let allRows=[];
+  const tableBody = document.getElementById("tableBody");
+  const countInfo = document.getElementById("countInfo");
 
-function render(rows){
+  const searchInput = document.getElementById("searchInput");
+  const actorFilter = document.getElementById("actorFilter");
+  const deptFilter = document.getElementById("deptFilter");
+  const communeFilter = document.getElementById("communeFilter");
+  const coverageFilter = document.getElementById("coverageFilter");
+  const serviceFilter = document.getElementById("serviceFilter");
+  const resetBtn = document.getElementById("resetBtn");
 
-const body=document.getElementById("tableBody");
+  function safe(v){
+    return (v ?? "").toString().trim();
+  }
 
-body.innerHTML="";
+  function splitValues(value){
+    return safe(value)
+      .split(";")
+      .map(v => v.trim())
+      .filter(Boolean);
+  }
 
-rows.forEach(r=>{
+  function normalize(text){
+    return safe(text).toLowerCase();
+  }
 
-const tr=document.createElement("tr");
+  function uniqueSorted(values){
+    return [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b, "fr"));
+  }
 
-tr.innerHTML=`
+  function makePill(text){
+    if(!text) return "";
+    return `<span class="pill">${text}</span>`;
+  }
 
-<td>${r.id||""}</td>
-<td>${r.actor_type||""}</td>
-<td>${r.structure||""}</td>
-<td>${r.service_domains||""}</td>
-<td>${r.target_groups||""}</td>
-<td>${r["departement(s)"]||""}</td>
-<td>${r.phone||""}</td>
-<td>${r.email||""}</td>
+  function populateSelect(selectEl, values, defaultLabel){
+    selectEl.innerHTML = `<option value="">${defaultLabel}</option>` +
+      values.map(v => `<option value="${v}">${v}</option>`).join("");
+  }
 
-`;
+  function buildFilters(rows){
+    const actorTypes = uniqueSorted(rows.map(r => safe(r.actor_type)));
+    const coverageLevels = uniqueSorted(rows.map(r => safe(r.coverage_level)));
 
-body.appendChild(tr);
+    const departments = uniqueSorted(
+      rows.flatMap(r => splitValues(r["departement(s)"]))
+    );
 
-});
+    const communes = uniqueSorted(
+      rows.flatMap(r => splitValues(r["commune(s)"] || r.commune || ""))
+    );
 
-}
+    const services = uniqueSorted(
+      rows.flatMap(r => splitValues(r.service_gbv_type))
+    );
 
-Papa.parse(CSV_URL,{
+    populateSelect(actorFilter, actorTypes, "Tous");
+    populateSelect(deptFilter, departments, "Tous");
+    populateSelect(communeFilter, communes, "Toutes");
+    populateSelect(coverageFilter, coverageLevels, "Tous");
+    populateSelect(serviceFilter, services, "Tous");
+  }
 
-download:true,
-header:true,
+  function rowMatchesFilters(row){
+    const q = normalize(searchInput.value);
+    const actor = safe(actorFilter.value);
+    const dept = safe(deptFilter.value);
+    const commune = safe(communeFilter.value);
+    const coverage = safe(coverageFilter.value);
+    const service = safe(serviceFilter.value);
 
-complete:function(res){
+    const haystack = Object.values(row)
+      .map(v => normalize(v))
+      .join(" ");
 
-allRows=res.data;
-render(allRows);
+    const matchesSearch = !q || haystack.includes(q);
+    const matchesActor = !actor || safe(row.actor_type) === actor;
+    const matchesCoverage = !coverage || safe(row.coverage_level) === coverage;
 
-}
+    const rowDepts = splitValues(row["departement(s)"]);
+    const matchesDept = !dept || rowDepts.includes(dept);
 
-});
+    const rowCommunes = splitValues(row["commune(s)"] || row.commune || "");
+    const matchesCommune = !commune || rowCommunes.includes(commune);
 
-document.getElementById("search").addEventListener("input",function(){
+    const rowServices = splitValues(row.service_gbv_type);
+    const matchesService = !service || rowServices.includes(service);
 
-const q=this.value.toLowerCase();
+    return matchesSearch && matchesActor && matchesCoverage && matchesDept && matchesCommune && matchesService;
+  }
 
-const filtered=allRows.filter(r=>
+  function renderTable(rows){
+    if(!rows.length){
+      tableBody.innerHTML = `<tr><td colspan="20" class="empty">Aucun résultat trouvé.</td></tr>`;
+      countInfo.textContent = "0 enregistrement affiché";
+      return;
+    }
 
-(r.structure||"").toLowerCase().includes(q)
+    tableBody.innerHTML = rows.map(row => `
+      <tr>
+        <td>${safe(row.id)}</td>
+        <td>${makePill(safe(row.actor_type))}</td>
+        <td><strong>${safe(row.structure)}</strong></td>
+        <td>${safe(row.service_domains)}</td>
+        <td>${safe(row.service_gbv_type)}</td>
+        <td>${safe(row.target_groups)}</td>
+        <td>${safe(row.region)}</td>
+        <td>${safe(row["departement(s)"])}</td>
+        <td>${safe(row["commune(s)"] || row.commune || "")}</td>
+        <td>${safe(row.coverage_level)}</td>
+        <td>${safe(row.forces)}</td>
+        <td>${safe(row.gaps)}</td>
+        <td>${safe(row.contact_name)}</td>
+        <td>${safe(row.contact_role)}</td>
+        <td>${safe(row.phone)}</td>
+        <td>${safe(row.email)}</td>
+        <td>${safe(row.address)}</td>
+        <td>${safe(row.latitude)}</td>
+        <td>${safe(row.longitude)}</td>
+        <td>${safe(row.notes)}</td>
+      </tr>
+    `).join("");
 
-);
+    countInfo.textContent = `${rows.length} enregistrement(s) affiché(s)`;
+  }
 
-render(filtered);
+  function applyFilters(){
+    const filtered = allRows.filter(rowMatchesFilters);
+    renderTable(filtered);
+  }
 
-});
+  function resetFilters(){
+    searchInput.value = "";
+    actorFilter.value = "";
+    deptFilter.value = "";
+    communeFilter.value = "";
+    coverageFilter.value = "";
+    serviceFilter.value = "";
+    renderTable(allRows);
+  }
 
+  Papa.parse(CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results){
+      allRows = results.data;
+      buildFilters(allRows);
+      renderTable(allRows);
+    },
+    error: function(err){
+      console.error("Erreur de chargement CSV :", err);
+      tableBody.innerHTML = `<tr><td colspan="20" class="empty">Erreur lors du chargement du CSV.</td></tr>`;
+      countInfo.textContent = "Erreur de chargement";
+    }
+  });
+
+  searchInput.addEventListener("input", applyFilters);
+  actorFilter.addEventListener("change", applyFilters);
+  deptFilter.addEventListener("change", applyFilters);
+  communeFilter.addEventListener("change", applyFilters);
+  coverageFilter.addEventListener("change", applyFilters);
+  serviceFilter.addEventListener("change", applyFilters);
+  resetBtn.addEventListener("click", resetFilters);
 </script>
 
 </body>
