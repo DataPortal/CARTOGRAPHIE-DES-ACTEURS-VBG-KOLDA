@@ -7,7 +7,69 @@
 
   <link rel="stylesheet" href="../assets/css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    .chart-title{
+      font-size:16px;
+      font-weight:800;
+      color:#0b1220;
+      margin:0 0 12px;
+    }
+
+    .chart-subtitle{
+      font-size:12px;
+      color:#5b6b80;
+      margin:0 0 14px;
+    }
+
+    .chart-card canvas{
+      max-height:360px;
+    }
+
+    .analysis-note{
+      margin-top:8px;
+      font-size:12px;
+      color:#5b6b80;
+    }
+
+    .coverage-box{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+      gap:12px;
+    }
+
+    .coverage-item{
+      padding:14px;
+      border:1px solid rgba(11,18,32,.12);
+      border-radius:12px;
+      background:#fff;
+    }
+
+    .coverage-item .name{
+      font-weight:800;
+      margin-bottom:8px;
+      color:#0b1220;
+    }
+
+    .coverage-item .meta{
+      display:block;
+      padding:0;
+      border:0;
+      background:transparent;
+      font-size:12px;
+      color:#5b6b80;
+      margin-bottom:4px;
+    }
+
+    .coverage-item .score{
+      margin-top:8px;
+      font-size:22px;
+      font-weight:900;
+      color:#1f5fa8;
+    }
+  </style>
 </head>
 <body>
 
@@ -19,6 +81,7 @@
     <a href="../">Accueil</a>
     <a href="../table/">Base de données</a>
     <a href="../map/">Carte</a>
+    <a href="../data/actors_vbg_kolda_geo_ready.csv">Télécharger le CSV</a>
   </div>
 </header>
 
@@ -61,245 +124,469 @@
   </div>
 
   <div class="grid" style="margin-bottom:24px;">
-    <div class="chart-card"><canvas id="chartActors"></canvas></div>
-    <div class="chart-card"><canvas id="chartDepartments"></canvas></div>
-    <div class="chart-card"><canvas id="chartServices"></canvas></div>
-    <div class="chart-card"><canvas id="chartCoverage"></canvas></div>
+    <div class="chart-card">
+      <h3 class="chart-title">Répartition des acteurs par type</h3>
+      <p class="chart-subtitle">Part relative des services étatiques et des ONG / associations.</p>
+      <canvas id="chartActors"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Acteurs par département</h3>
+      <p class="chart-subtitle">Nombre d’acteurs intervenant dans chaque département ciblé.</p>
+      <canvas id="chartDepartments"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Types de services VBG</h3>
+      <p class="chart-subtitle">Répartition des catégories de services disponibles.</p>
+      <canvas id="chartServices"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Niveau de couverture</h3>
+      <p class="chart-subtitle">Portée territoriale déclarée par les structures.</p>
+      <canvas id="chartCoverage"></canvas>
+    </div>
   </div>
 
   <div class="grid" style="margin-bottom:24px;">
-    <div class="chart-card"><canvas id="chartGaps"></canvas></div>
     <div class="chart-card">
-      <h2 class="section-title">Indice de couverture VBG</h2>
-      <div id="coverageIndexBox"></div>
+      <h3 class="chart-title">Analyse automatique des gaps</h3>
+      <p class="chart-subtitle">Principales contraintes remontées par les structures.</p>
+      <canvas id="chartGaps"></canvas>
+      <p class="analysis-note">Les gaps sont regroupés automatiquement par grandes catégories analytiques.</p>
+    </div>
+
+    <div class="chart-card">
+      <h3 class="chart-title">Indice de couverture VBG</h3>
+      <p class="chart-subtitle">Score simple par département = nombre d’acteurs + nombre de types de services.</p>
+      <div id="coverageIndexBox" class="coverage-box"></div>
     </div>
   </div>
 
 </div>
 
 <script>
-const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
-const BLUE = "#1f5fa8";
-const ORANGE = "#f58220";
-const GRAY = "#93a1b2";
+  Chart.register(ChartDataLabels);
 
-let rawRows = [];
-let charts = [];
+  const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
 
-const actorFilter = document.getElementById("actorFilter");
-const deptFilter = document.getElementById("deptFilter");
-const serviceFilter = document.getElementById("serviceFilter");
-
-function safe(v){ return (v ?? "").toString().trim(); }
-
-function splitValues(v){
-  return safe(v).split(";").map(x => x.trim()).filter(Boolean);
-}
-
-function normalizeDeptName(name){
-  const n = safe(name).toLowerCase();
-  if (n === "médina yorofoulah" || n === "medina yorofoula" || n === "médina-yorofoula" || n === "medina-yorofoula" || n === "médina yoro foulah") {
-    return "Médina Yoro Foulah";
-  }
-  if (n === "velingara") return "Vélingara";
-  if (n === "kolda") return "Kolda";
-  return safe(name);
-}
-
-function uniqueSorted(values){
-  return [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b, "fr"));
-}
-
-function countBy(rows, accessor){
-  const out = {};
-  rows.forEach(r => {
-    const key = accessor(r);
-    if(!key) return;
-    out[key] = (out[key] || 0) + 1;
-  });
-  return out;
-}
-
-function countMulti(rows, accessor){
-  const out = {};
-  rows.forEach(r => {
-    accessor(r).forEach(v => {
-      if(!v) return;
-      out[v] = (out[v] || 0) + 1;
-    });
-  });
-  return out;
-}
-
-function classifyGap(text){
-  const t = safe(text).toLowerCase();
-  if (t.includes("financement") || t.includes("budget") || t.includes("ressources financières")) return "Financement";
-  if (t.includes("logistique") || t.includes("déplacement") || t.includes("transport")) return "Logistique";
-  if (t.includes("ressources humaines") || t.includes("personnel") || t.includes("rh")) return "Ressources humaines";
-  if (t.includes("résistance") || t.includes("socioculturel") || t.includes("normes")) return "Contraintes socioculturelles";
-  if (t.includes("hébergement") || t.includes("locaux") || t.includes("infrastructure")) return "Infrastructure / accueil";
-  if (t.includes("coordination") || t.includes("chevauchement")) return "Coordination";
-  if (t.includes("médicament") || t.includes("médicale") || t.includes("médical")) return "Capacité technique / intrants";
-  return "Autres";
-}
-
-function saveFilters(){
-  const filters = {
-    actor: actorFilter.value,
-    dept: deptFilter.value,
-    service: serviceFilter.value
+  const PALETTE = {
+    blue: "#2563eb",
+    sky: "#0ea5e9",
+    cyan: "#06b6d4",
+    teal: "#14b8a6",
+    green: "#10b981",
+    lime: "#84cc16",
+    amber: "#f59e0b",
+    orange: "#f97316",
+    rose: "#f43f5e",
+    red: "#ef4444",
+    violet: "#8b5cf6",
+    indigo: "#6366f1",
+    slate: "#64748b"
   };
-  localStorage.setItem("vbg_kolda_filters", JSON.stringify(filters));
-}
 
-function loadFilters(){
-  try{
-    const raw = localStorage.getItem("vbg_kolda_filters");
-    if(!raw) return;
-    const f = JSON.parse(raw);
-    if (f.actor) actorFilter.value = f.actor;
-    if (f.dept) deptFilter.value = f.dept;
-    if (f.service) serviceFilter.value = f.service;
-  }catch(e){}
-}
+  let rawRows = [];
+  let charts = [];
 
-function populateFilters(rows){
-  const actorTypes = uniqueSorted(rows.map(r => safe(r.actor_type)));
-  const departments = uniqueSorted(rows.flatMap(r => splitValues(r["departement(s)"]).map(normalizeDeptName)));
-  const services = uniqueSorted(rows.flatMap(r => splitValues(r.service_gbv_type)));
+  const actorFilter = document.getElementById("actorFilter");
+  const deptFilter = document.getElementById("deptFilter");
+  const serviceFilter = document.getElementById("serviceFilter");
 
-  actorFilter.innerHTML = `<option value="">Tous</option>` + actorTypes.map(t => `<option value="${t}">${t}</option>`).join("");
-  deptFilter.innerHTML = `<option value="">Tous</option>` + departments.map(d => `<option value="${d}">${d}</option>`).join("");
-  serviceFilter.innerHTML = `<option value="">Tous</option>` + services.map(s => `<option value="${s}">${s}</option>`).join("");
+  function safe(v){
+    return (v ?? "").toString().trim();
+  }
 
-  loadFilters();
-}
+  function splitValues(v){
+    return safe(v).split(";").map(x => x.trim()).filter(Boolean);
+  }
 
-function getFilteredRows(){
-  const actor = safe(actorFilter.value);
-  const dept = safe(deptFilter.value);
-  const service = safe(serviceFilter.value);
+  function normalizeDeptName(name){
+    const n = safe(name).toLowerCase();
+    if (
+      n === "médina yorofoulah" ||
+      n === "medina yorofoula" ||
+      n === "médina-yorofoula" ||
+      n === "medina-yorofoula" ||
+      n === "médina yoro foulah"
+    ) return "Médina Yoro Foulah";
+    if (n === "velingara") return "Vélingara";
+    if (n === "kolda") return "Kolda";
+    return safe(name);
+  }
 
-  return rawRows.filter(r => {
-    const actorOk = !actor || safe(r.actor_type) === actor;
-    const deptOk = !dept || splitValues(r["departement(s)"]).map(normalizeDeptName).includes(dept);
-    const serviceOk = !service || splitValues(r.service_gbv_type).includes(service);
-    return actorOk && deptOk && serviceOk;
-  });
-}
+  function uniqueSorted(values){
+    return [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b, "fr"));
+  }
 
-function destroyCharts(){
-  charts.forEach(c => c.destroy());
-  charts = [];
-}
+  function countBy(rows, accessor){
+    const out = {};
+    rows.forEach(r => {
+      const key = accessor(r);
+      if(!key) return;
+      out[key] = (out[key] || 0) + 1;
+    });
+    return out;
+  }
 
-function createChart(id, type, labels, data, label, color){
-  const chart = new Chart(document.getElementById(id), {
-    type,
-    data: {
-      labels,
-      datasets: [{
-        label,
-        data,
-        backgroundColor: Array.isArray(color) ? color : color,
-        borderWidth: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { display: type === "pie" || type === "doughnut" }
+  function countMulti(rows, accessor){
+    const out = {};
+    rows.forEach(r => {
+      accessor(r).forEach(v => {
+        if(!v) return;
+        out[v] = (out[v] || 0) + 1;
+      });
+    });
+    return out;
+  }
+
+  function classifyGap(text){
+    const t = safe(text).toLowerCase();
+
+    if (t.includes("financement") || t.includes("budget") || t.includes("ressources financières")) return "Financement";
+    if (t.includes("logistique") || t.includes("déplacement") || t.includes("transport")) return "Logistique";
+    if (t.includes("ressources humaines") || t.includes("personnel") || t.includes("rh")) return "Ressources humaines";
+    if (t.includes("résistance") || t.includes("socioculturel") || t.includes("normes")) return "Contraintes socioculturelles";
+    if (t.includes("hébergement") || t.includes("locaux") || t.includes("infrastructure")) return "Infrastructure / accueil";
+    if (t.includes("coordination") || t.includes("chevauchement")) return "Coordination";
+    if (t.includes("médicament") || t.includes("médicale") || t.includes("médical")) return "Capacité technique / intrants";
+    return "Autres";
+  }
+
+  function saveFilters(){
+    const filters = {
+      actor: actorFilter.value,
+      dept: deptFilter.value,
+      service: serviceFilter.value
+    };
+    localStorage.setItem("vbg_kolda_filters", JSON.stringify(filters));
+  }
+
+  function loadFilters(){
+    try{
+      const raw = localStorage.getItem("vbg_kolda_filters");
+      if(!raw) return;
+      const f = JSON.parse(raw);
+      if (f.actor) actorFilter.value = f.actor;
+      if (f.dept) deptFilter.value = f.dept;
+      if (f.service) serviceFilter.value = f.service;
+    }catch(e){}
+  }
+
+  function populateFilters(rows){
+    const actorTypes = uniqueSorted(rows.map(r => safe(r.actor_type)));
+    const departments = uniqueSorted(rows.flatMap(r => splitValues(r["departement(s)"]).map(normalizeDeptName)));
+    const services = uniqueSorted(rows.flatMap(r => splitValues(r.service_gbv_type)));
+
+    actorFilter.innerHTML = `<option value="">Tous</option>` + actorTypes.map(t => `<option value="${t}">${t}</option>`).join("");
+    deptFilter.innerHTML = `<option value="">Tous</option>` + departments.map(d => `<option value="${d}">${d}</option>`).join("");
+    serviceFilter.innerHTML = `<option value="">Tous</option>` + services.map(s => `<option value="${s}">${s}</option>`).join("");
+
+    loadFilters();
+  }
+
+  function getFilteredRows(){
+    const actor = safe(actorFilter.value);
+    const dept = safe(deptFilter.value);
+    const service = safe(serviceFilter.value);
+
+    return rawRows.filter(r => {
+      const actorOk = !actor || safe(r.actor_type) === actor;
+      const deptOk = !dept || splitValues(r["departement(s)"]).map(normalizeDeptName).includes(dept);
+      const serviceOk = !service || splitValues(r.service_gbv_type).includes(service);
+      return actorOk && deptOk && serviceOk;
+    });
+  }
+
+  function destroyCharts(){
+    charts.forEach(c => c.destroy());
+    charts = [];
+  }
+
+  function formatPercent(value, total){
+    if (!total) return "0%";
+    return ((value / total) * 100).toFixed(1) + "%";
+  }
+
+  function createDoughnutChart(id, labels, data, colors){
+    const total = data.reduce((a,b)=>a+b,0);
+
+    const chart = new Chart(document.getElementById(id), {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: colors,
+          borderColor: "#ffffff",
+          borderWidth: 2
+        }]
       },
-      scales: type === "pie" || type === "doughnut" ? {} : {
-        y: { beginAtZero: true }
+      options: {
+        responsive: true,
+        cutout: "56%",
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: {
+              usePointStyle: true,
+              boxWidth: 10
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context){
+                const value = context.raw || 0;
+                return `${context.label}: ${value} (${formatPercent(value, total)})`;
+              }
+            }
+          },
+          datalabels: {
+            color: "#0b1220",
+            font: { weight: "700", size: 11 },
+            formatter: function(value){
+              return `${value}\n${formatPercent(value, total)}`;
+            }
+          }
+        }
       }
+    });
+
+    charts.push(chart);
+  }
+
+  function createBarChart(id, labels, data, label, color){
+    const total = data.reduce((a,b)=>a+b,0);
+
+    const chart = new Chart(document.getElementById(id), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data,
+          backgroundColor: color,
+          borderRadius: 8,
+          maxBarThickness: 42
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context){
+                const value = context.raw || 0;
+                return `${label}: ${value} (${formatPercent(value, total)})`;
+              }
+            }
+          },
+          datalabels: {
+            anchor: "end",
+            align: "end",
+            color: "#0b1220",
+            font: { weight: "700", size: 11 },
+            formatter: function(value){
+              return `${value} (${formatPercent(value, total)})`;
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: "#334155" },
+            grid: { display: false }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { color: "#334155", precision: 0 },
+            grid: { color: "rgba(148,163,184,.18)" }
+          }
+        }
+      }
+    });
+
+    charts.push(chart);
+  }
+
+  function createHorizontalBarChart(id, labels, data, label, colors){
+    const total = data.reduce((a,b)=>a+b,0);
+
+    const chart = new Chart(document.getElementById(id), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data,
+          backgroundColor: colors,
+          borderRadius: 8,
+          maxBarThickness: 32
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context){
+                const value = context.raw || 0;
+                return `${label}: ${value} (${formatPercent(value, total)})`;
+              }
+            }
+          },
+          datalabels: {
+            anchor: "end",
+            align: "right",
+            color: "#0b1220",
+            font: { weight: "700", size: 11 },
+            formatter: function(value){
+              return `${value} (${formatPercent(value, total)})`;
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            ticks: { color: "#334155", precision: 0 },
+            grid: { color: "rgba(148,163,184,.18)" }
+          },
+          y: {
+            ticks: { color: "#334155" },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+
+    charts.push(chart);
+  }
+
+  function renderCoverageIndex(rows){
+    const deptActors = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
+    const deptServices = {};
+
+    rows.forEach(r => {
+      const depts = splitValues(r["departement(s)"]).map(normalizeDeptName);
+      const services = splitValues(r.service_gbv_type);
+      depts.forEach(d => {
+        if(!deptServices[d]) deptServices[d] = new Set();
+        services.forEach(s => deptServices[d].add(s));
+      });
+    });
+
+    const depts = Object.keys(deptActors).sort((a,b)=>a.localeCompare(b, "fr"));
+
+    document.getElementById("coverageIndexBox").innerHTML = depts.map(d => {
+      const actorCount = deptActors[d] || 0;
+      const serviceCount = deptServices[d] ? deptServices[d].size : 0;
+      const index = actorCount + serviceCount;
+
+      return `
+        <div class="coverage-item">
+          <div class="name">${d}</div>
+          <span class="meta">Acteurs : ${actorCount}</span>
+          <span class="meta">Types de services : ${serviceCount}</span>
+          <div class="score">${index}</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function redrawAnalysis(){
+    saveFilters();
+
+    const rows = getFilteredRows();
+    destroyCharts();
+
+    const totalActors = rows.length;
+    const stateActors = rows.filter(r => safe(r.actor_type).toLowerCase().includes("étatique")).length;
+    const oscActors = totalActors - stateActors;
+    const uniqueServices = [...new Set(rows.flatMap(r => splitValues(r.service_gbv_type)))].length;
+
+    document.getElementById("kpiActors").textContent = totalActors;
+    document.getElementById("kpiState").textContent = stateActors;
+    document.getElementById("kpiOsc").textContent = oscActors;
+    document.getElementById("kpiServices").textContent = uniqueServices;
+
+    // Acteurs par type
+    const actorCounts = countBy(rows, r => safe(r.actor_type));
+    createDoughnutChart(
+      "chartActors",
+      Object.keys(actorCounts),
+      Object.values(actorCounts),
+      [PALETTE.blue, PALETTE.orange, PALETTE.slate]
+    );
+
+    // Acteurs par département
+    const deptCounts = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
+    createBarChart(
+      "chartDepartments",
+      Object.keys(deptCounts),
+      Object.values(deptCounts),
+      "Acteurs",
+      [PALETTE.teal, PALETTE.blue, PALETTE.violet]
+    );
+
+    // Services VBG
+    const serviceCounts = countMulti(rows, r => splitValues(r.service_gbv_type));
+    createHorizontalBarChart(
+      "chartServices",
+      Object.keys(serviceCounts),
+      Object.values(serviceCounts),
+      "Services VBG",
+      [PALETTE.orange, PALETTE.amber, PALETTE.green, PALETTE.cyan, PALETTE.violet, PALETTE.rose, PALETTE.sky]
+    );
+
+    // Couverture
+    const coverageCounts = countBy(rows, r => safe(r.coverage_level));
+    createDoughnutChart(
+      "chartCoverage",
+      Object.keys(coverageCounts),
+      Object.values(coverageCounts),
+      [PALETTE.indigo, PALETTE.cyan, PALETTE.green, PALETTE.amber, PALETTE.rose]
+    );
+
+    // Gaps
+    const gapClasses = {};
+    rows.forEach(r => {
+      const g = classifyGap(r.gaps);
+      gapClasses[g] = (gapClasses[g] || 0) + 1;
+    });
+
+    createHorizontalBarChart(
+      "chartGaps",
+      Object.keys(gapClasses),
+      Object.values(gapClasses),
+      "Gaps",
+      [PALETTE.red, PALETTE.orange, PALETTE.amber, PALETTE.violet, PALETTE.slate, PALETTE.teal]
+    );
+
+    // Coverage index
+    renderCoverageIndex(rows);
+  }
+
+  Papa.parse(CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(res){
+      rawRows = res.data || [];
+      populateFilters(rawRows);
+      redrawAnalysis();
+    },
+    error: function(err){
+      console.error(err);
+      alert("Erreur lors du chargement du CSV.");
     }
   });
-  charts.push(chart);
-}
 
-function renderCoverageIndex(rows){
-  const deptActors = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
-  const deptServices = {};
-
-  rows.forEach(r => {
-    const depts = splitValues(r["departement(s)"]).map(normalizeDeptName);
-    const services = splitValues(r.service_gbv_type);
-    depts.forEach(d => {
-      if(!deptServices[d]) deptServices[d] = new Set();
-      services.forEach(s => deptServices[d].add(s));
-    });
-  });
-
-  const depts = Object.keys(deptActors).sort((a,b)=>a.localeCompare(b,"fr"));
-  document.getElementById("coverageIndexBox").innerHTML = depts.map(d => {
-    const actorCount = deptActors[d] || 0;
-    const serviceCount = deptServices[d] ? deptServices[d].size : 0;
-    const index = actorCount + serviceCount;
-    return `
-      <div style="padding:12px;border:1px solid rgba(11,18,32,.12);border-radius:10px;margin-bottom:10px;">
-        <strong>${d}</strong><br>
-        <span class="small">Acteurs : ${actorCount}</span><br>
-        <span class="small">Types de services : ${serviceCount}</span><br>
-        <span style="font-weight:800;color:${BLUE};font-size:18px;">Indice : ${index}</span>
-      </div>
-    `;
-  }).join("");
-}
-
-function redrawAnalysis(){
-  saveFilters();
-
-  const rows = getFilteredRows();
-  destroyCharts();
-
-  const totalActors = rows.length;
-  const stateActors = rows.filter(r => safe(r.actor_type).toLowerCase().includes("étatique")).length;
-  const oscActors = totalActors - stateActors;
-  const uniqueServices = [...new Set(rows.flatMap(r => splitValues(r.service_gbv_type)))].length;
-
-  document.getElementById("kpiActors").textContent = totalActors;
-  document.getElementById("kpiState").textContent = stateActors;
-  document.getElementById("kpiOsc").textContent = oscActors;
-  document.getElementById("kpiServices").textContent = uniqueServices;
-
-  const actorCounts = countBy(rows, r => safe(r.actor_type));
-  createChart("chartActors", "pie", Object.keys(actorCounts), Object.values(actorCounts), "Acteurs par type", [BLUE, ORANGE, GRAY]);
-
-  const deptCounts = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
-  createChart("chartDepartments", "bar", Object.keys(deptCounts), Object.values(deptCounts), "Acteurs par département", BLUE);
-
-  const serviceCounts = countMulti(rows, r => splitValues(r.service_gbv_type));
-  createChart("chartServices", "bar", Object.keys(serviceCounts), Object.values(serviceCounts), "Types de services VBG", ORANGE);
-
-  const coverageCounts = countBy(rows, r => safe(r.coverage_level));
-  createChart("chartCoverage", "bar", Object.keys(coverageCounts), Object.values(coverageCounts), "Niveau de couverture", "#5b6b80");
-
-  const gapClasses = {};
-  rows.forEach(r => {
-    const g = classifyGap(r.gaps);
-    gapClasses[g] = (gapClasses[g] || 0) + 1;
-  });
-
-  createChart("chartGaps", "bar", Object.keys(gapClasses), Object.values(gapClasses), "Gaps dominants", "#c94f4f");
-
-  renderCoverageIndex(rows);
-}
-
-Papa.parse(CSV_URL, {
-  download: true,
-  header: true,
-  skipEmptyLines: true,
-  complete: function(res){
-    rawRows = res.data || [];
-    populateFilters(rawRows);
-    redrawAnalysis();
-  }
-});
-
-actorFilter.addEventListener("change", redrawAnalysis);
-deptFilter.addEventListener("change", redrawAnalysis);
-serviceFilter.addEventListener("change", redrawAnalysis);
+  actorFilter.addEventListener("change", redrawAnalysis);
+  deptFilter.addEventListener("change", redrawAnalysis);
+  serviceFilter.addEventListener("change", redrawAnalysis);
 </script>
 
 </body>
