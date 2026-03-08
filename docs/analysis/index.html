@@ -13,7 +13,7 @@
 
 <header>
   <h1>Analyse du système VBG — Région de Kolda</h1>
-  <p>Tableau de bord analytique des acteurs, services, gaps et couverture territoriale.</p>
+  <p>Tableau de bord analytique synchronisé avec les filtres de la carte.</p>
 
   <div class="top-links">
     <a href="../">Accueil</a>
@@ -23,6 +23,23 @@
 </header>
 
 <div class="container">
+
+  <div class="filters" style="margin-bottom:16px;">
+    <div class="filter-group">
+      <label>Type d’acteur</label>
+      <select id="actorFilter"><option value="">Tous</option></select>
+    </div>
+
+    <div class="filter-group">
+      <label>Département</label>
+      <select id="deptFilter"><option value="">Tous</option></select>
+    </div>
+
+    <div class="filter-group">
+      <label>Type de service VBG</label>
+      <select id="serviceFilter"><option value="">Tous</option></select>
+    </div>
+  </div>
 
   <div class="kpi-grid">
     <div class="kpi">
@@ -66,6 +83,13 @@ const BLUE = "#1f5fa8";
 const ORANGE = "#f58220";
 const GRAY = "#93a1b2";
 
+let rawRows = [];
+let charts = [];
+
+const actorFilter = document.getElementById("actorFilter");
+const deptFilter = document.getElementById("deptFilter");
+const serviceFilter = document.getElementById("serviceFilter");
+
 function safe(v){ return (v ?? "").toString().trim(); }
 
 function splitValues(v){
@@ -80,6 +104,10 @@ function normalizeDeptName(name){
   if (n === "velingara") return "Vélingara";
   if (n === "kolda") return "Kolda";
   return safe(name);
+}
+
+function uniqueSorted(values){
+  return [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b, "fr"));
 }
 
 function countBy(rows, accessor){
@@ -103,12 +131,70 @@ function countMulti(rows, accessor){
   return out;
 }
 
-function topEntries(obj, topN = 10){
-  return Object.entries(obj).sort((a,b) => b[1] - a[1]).slice(0, topN);
+function classifyGap(text){
+  const t = safe(text).toLowerCase();
+  if (t.includes("financement") || t.includes("budget") || t.includes("ressources financières")) return "Financement";
+  if (t.includes("logistique") || t.includes("déplacement") || t.includes("transport")) return "Logistique";
+  if (t.includes("ressources humaines") || t.includes("personnel") || t.includes("rh")) return "Ressources humaines";
+  if (t.includes("résistance") || t.includes("socioculturel") || t.includes("normes")) return "Contraintes socioculturelles";
+  if (t.includes("hébergement") || t.includes("locaux") || t.includes("infrastructure")) return "Infrastructure / accueil";
+  if (t.includes("coordination") || t.includes("chevauchement")) return "Coordination";
+  if (t.includes("médicament") || t.includes("médicale") || t.includes("médical")) return "Capacité technique / intrants";
+  return "Autres";
+}
+
+function saveFilters(){
+  const filters = {
+    actor: actorFilter.value,
+    dept: deptFilter.value,
+    service: serviceFilter.value
+  };
+  localStorage.setItem("vbg_kolda_filters", JSON.stringify(filters));
+}
+
+function loadFilters(){
+  try{
+    const raw = localStorage.getItem("vbg_kolda_filters");
+    if(!raw) return;
+    const f = JSON.parse(raw);
+    if (f.actor) actorFilter.value = f.actor;
+    if (f.dept) deptFilter.value = f.dept;
+    if (f.service) serviceFilter.value = f.service;
+  }catch(e){}
+}
+
+function populateFilters(rows){
+  const actorTypes = uniqueSorted(rows.map(r => safe(r.actor_type)));
+  const departments = uniqueSorted(rows.flatMap(r => splitValues(r["departement(s)"]).map(normalizeDeptName)));
+  const services = uniqueSorted(rows.flatMap(r => splitValues(r.service_gbv_type)));
+
+  actorFilter.innerHTML = `<option value="">Tous</option>` + actorTypes.map(t => `<option value="${t}">${t}</option>`).join("");
+  deptFilter.innerHTML = `<option value="">Tous</option>` + departments.map(d => `<option value="${d}">${d}</option>`).join("");
+  serviceFilter.innerHTML = `<option value="">Tous</option>` + services.map(s => `<option value="${s}">${s}</option>`).join("");
+
+  loadFilters();
+}
+
+function getFilteredRows(){
+  const actor = safe(actorFilter.value);
+  const dept = safe(deptFilter.value);
+  const service = safe(serviceFilter.value);
+
+  return rawRows.filter(r => {
+    const actorOk = !actor || safe(r.actor_type) === actor;
+    const deptOk = !dept || splitValues(r["departement(s)"]).map(normalizeDeptName).includes(dept);
+    const serviceOk = !service || splitValues(r.service_gbv_type).includes(service);
+    return actorOk && deptOk && serviceOk;
+  });
+}
+
+function destroyCharts(){
+  charts.forEach(c => c.destroy());
+  charts = [];
 }
 
 function createChart(id, type, labels, data, label, color){
-  new Chart(document.getElementById(id), {
+  const chart = new Chart(document.getElementById(id), {
     type,
     data: {
       labels,
@@ -129,19 +215,7 @@ function createChart(id, type, labels, data, label, color){
       }
     }
   });
-}
-
-function classifyGap(text){
-  const t = safe(text).toLowerCase();
-
-  if (t.includes("financement") || t.includes("budget") || t.includes("ressources financières")) return "Financement";
-  if (t.includes("logistique") || t.includes("déplacement") || t.includes("transport")) return "Logistique";
-  if (t.includes("ressources humaines") || t.includes("personnel") || t.includes("rh")) return "Ressources humaines";
-  if (t.includes("résistance") || t.includes("socioculturel") || t.includes("normes")) return "Contraintes socioculturelles";
-  if (t.includes("hébergement") || t.includes("locaux") || t.includes("infrastructure")) return "Infrastructure / accueil";
-  if (t.includes("coordination") || t.includes("chevauchement")) return "Coordination";
-  if (t.includes("médicament") || t.includes("médicale") || t.includes("médical")) return "Capacité technique / intrants";
-  return "Autres";
+  charts.push(chart);
 }
 
 function renderCoverageIndex(rows){
@@ -158,11 +232,10 @@ function renderCoverageIndex(rows){
   });
 
   const depts = Object.keys(deptActors).sort((a,b)=>a.localeCompare(b,"fr"));
-  const html = depts.map(d => {
+  document.getElementById("coverageIndexBox").innerHTML = depts.map(d => {
     const actorCount = deptActors[d] || 0;
     const serviceCount = deptServices[d] ? deptServices[d].size : 0;
     const index = actorCount + serviceCount;
-
     return `
       <div style="padding:12px;border:1px solid rgba(11,18,32,.12);border-radius:10px;margin-bottom:10px;">
         <strong>${d}</strong><br>
@@ -172,8 +245,45 @@ function renderCoverageIndex(rows){
       </div>
     `;
   }).join("");
+}
 
-  document.getElementById("coverageIndexBox").innerHTML = html;
+function redrawAnalysis(){
+  saveFilters();
+
+  const rows = getFilteredRows();
+  destroyCharts();
+
+  const totalActors = rows.length;
+  const stateActors = rows.filter(r => safe(r.actor_type).toLowerCase().includes("étatique")).length;
+  const oscActors = totalActors - stateActors;
+  const uniqueServices = [...new Set(rows.flatMap(r => splitValues(r.service_gbv_type)))].length;
+
+  document.getElementById("kpiActors").textContent = totalActors;
+  document.getElementById("kpiState").textContent = stateActors;
+  document.getElementById("kpiOsc").textContent = oscActors;
+  document.getElementById("kpiServices").textContent = uniqueServices;
+
+  const actorCounts = countBy(rows, r => safe(r.actor_type));
+  createChart("chartActors", "pie", Object.keys(actorCounts), Object.values(actorCounts), "Acteurs par type", [BLUE, ORANGE, GRAY]);
+
+  const deptCounts = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
+  createChart("chartDepartments", "bar", Object.keys(deptCounts), Object.values(deptCounts), "Acteurs par département", BLUE);
+
+  const serviceCounts = countMulti(rows, r => splitValues(r.service_gbv_type));
+  createChart("chartServices", "bar", Object.keys(serviceCounts), Object.values(serviceCounts), "Types de services VBG", ORANGE);
+
+  const coverageCounts = countBy(rows, r => safe(r.coverage_level));
+  createChart("chartCoverage", "bar", Object.keys(coverageCounts), Object.values(coverageCounts), "Niveau de couverture", "#5b6b80");
+
+  const gapClasses = {};
+  rows.forEach(r => {
+    const g = classifyGap(r.gaps);
+    gapClasses[g] = (gapClasses[g] || 0) + 1;
+  });
+
+  createChart("chartGaps", "bar", Object.keys(gapClasses), Object.values(gapClasses), "Gaps dominants", "#c94f4f");
+
+  renderCoverageIndex(rows);
 }
 
 Papa.parse(CSV_URL, {
@@ -181,42 +291,15 @@ Papa.parse(CSV_URL, {
   header: true,
   skipEmptyLines: true,
   complete: function(res){
-    const rows = res.data || [];
-
-    const totalActors = rows.length;
-    const stateActors = rows.filter(r => safe(r.actor_type).toLowerCase().includes("étatique")).length;
-    const oscActors = totalActors - stateActors;
-    const uniqueServices = [...new Set(rows.flatMap(r => splitValues(r.service_gbv_type)))].length;
-
-    document.getElementById("kpiActors").textContent = totalActors;
-    document.getElementById("kpiState").textContent = stateActors;
-    document.getElementById("kpiOsc").textContent = oscActors;
-    document.getElementById("kpiServices").textContent = uniqueServices;
-
-    const actorCounts = countBy(rows, r => safe(r.actor_type));
-    createChart("chartActors", "pie", Object.keys(actorCounts), Object.values(actorCounts), "Acteurs par type", [BLUE, ORANGE, GRAY]);
-
-    const deptCounts = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
-    createChart("chartDepartments", "bar", Object.keys(deptCounts), Object.values(deptCounts), "Acteurs par département", BLUE);
-
-    const serviceCounts = countMulti(rows, r => splitValues(r.service_gbv_type));
-    createChart("chartServices", "bar", Object.keys(serviceCounts), Object.values(serviceCounts), "Types de services VBG", ORANGE);
-
-    const coverageCounts = countBy(rows, r => safe(r.coverage_level));
-    createChart("chartCoverage", "bar", Object.keys(coverageCounts), Object.values(coverageCounts), "Niveau de couverture", "#5b6b80");
-
-    const gapClasses = {};
-    rows.forEach(r => {
-      const g = classifyGap(r.gaps);
-      gapClasses[g] = (gapClasses[g] || 0) + 1;
-    });
-
-    const topGaps = topEntries(gapClasses, 10);
-    createChart("chartGaps", "bar", topGaps.map(x => x[0]), topGaps.map(x => x[1]), "Gaps dominants", "#c94f4f");
-
-    renderCoverageIndex(rows);
+    rawRows = res.data || [];
+    populateFilters(rawRows);
+    redrawAnalysis();
   }
 });
+
+actorFilter.addEventListener("change", redrawAnalysis);
+deptFilter.addEventListener("change", redrawAnalysis);
+serviceFilter.addEventListener("change", redrawAnalysis);
 </script>
 
 </body>
