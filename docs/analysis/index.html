@@ -67,7 +67,20 @@ const ORANGE = "#f58220";
 const GRAY = "#93a1b2";
 
 function safe(v){ return (v ?? "").toString().trim(); }
-function splitValues(v){ return safe(v).split(";").map(x => x.trim()).filter(Boolean); }
+
+function splitValues(v){
+  return safe(v).split(";").map(x => x.trim()).filter(Boolean);
+}
+
+function normalizeDeptName(name){
+  const n = safe(name).toLowerCase();
+  if (n === "médina yorofoulah" || n === "medina yorofoula" || n === "médina-yorofoula" || n === "medina-yorofoula" || n === "médina yoro foulah") {
+    return "Médina Yoro Foulah";
+  }
+  if (n === "velingara") return "Vélingara";
+  if (n === "kolda") return "Kolda";
+  return safe(name);
+}
 
 function countBy(rows, accessor){
   const out = {};
@@ -91,7 +104,7 @@ function countMulti(rows, accessor){
 }
 
 function topEntries(obj, topN = 10){
-  return Object.entries(obj).sort((a,b) => b[1]-a[1]).slice(0, topN);
+  return Object.entries(obj).sort((a,b) => b[1] - a[1]).slice(0, topN);
 }
 
 function createChart(id, type, labels, data, label, color){
@@ -132,11 +145,11 @@ function classifyGap(text){
 }
 
 function renderCoverageIndex(rows){
-  const deptActors = countMulti(rows, r => splitValues(r["departement(s)"]));
+  const deptActors = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
   const deptServices = {};
 
   rows.forEach(r => {
-    const depts = splitValues(r["departement(s)"]);
+    const depts = splitValues(r["departement(s)"]).map(normalizeDeptName);
     const services = splitValues(r.service_gbv_type);
     depts.forEach(d => {
       if(!deptServices[d]) deptServices[d] = new Set();
@@ -170,7 +183,6 @@ Papa.parse(CSV_URL, {
   complete: function(res){
     const rows = res.data || [];
 
-    // KPI
     const totalActors = rows.length;
     const stateActors = rows.filter(r => safe(r.actor_type).toLowerCase().includes("étatique")).length;
     const oscActors = totalActors - stateActors;
@@ -181,51 +193,18 @@ Papa.parse(CSV_URL, {
     document.getElementById("kpiOsc").textContent = oscActors;
     document.getElementById("kpiServices").textContent = uniqueServices;
 
-    // Type acteur
     const actorCounts = countBy(rows, r => safe(r.actor_type));
-    createChart(
-      "chartActors",
-      "pie",
-      Object.keys(actorCounts),
-      Object.values(actorCounts),
-      "Acteurs par type",
-      [BLUE, ORANGE, GRAY]
-    );
+    createChart("chartActors", "pie", Object.keys(actorCounts), Object.values(actorCounts), "Acteurs par type", [BLUE, ORANGE, GRAY]);
 
-    // Départements
-    const deptCounts = countMulti(rows, r => splitValues(r["departement(s)"]));
-    createChart(
-      "chartDepartments",
-      "bar",
-      Object.keys(deptCounts),
-      Object.values(deptCounts),
-      "Acteurs par département",
-      BLUE
-    );
+    const deptCounts = countMulti(rows, r => splitValues(r["departement(s)"]).map(normalizeDeptName));
+    createChart("chartDepartments", "bar", Object.keys(deptCounts), Object.values(deptCounts), "Acteurs par département", BLUE);
 
-    // Services VBG
     const serviceCounts = countMulti(rows, r => splitValues(r.service_gbv_type));
-    createChart(
-      "chartServices",
-      "bar",
-      Object.keys(serviceCounts),
-      Object.values(serviceCounts),
-      "Types de services VBG",
-      ORANGE
-    );
+    createChart("chartServices", "bar", Object.keys(serviceCounts), Object.values(serviceCounts), "Types de services VBG", ORANGE);
 
-    // Couverture
     const coverageCounts = countBy(rows, r => safe(r.coverage_level));
-    createChart(
-      "chartCoverage",
-      "bar",
-      Object.keys(coverageCounts),
-      Object.values(coverageCounts),
-      "Niveau de couverture",
-      "#5b6b80"
-    );
+    createChart("chartCoverage", "bar", Object.keys(coverageCounts), Object.values(coverageCounts), "Niveau de couverture", "#5b6b80");
 
-    // Gaps automatiques
     const gapClasses = {};
     rows.forEach(r => {
       const g = classifyGap(r.gaps);
@@ -233,16 +212,8 @@ Papa.parse(CSV_URL, {
     });
 
     const topGaps = topEntries(gapClasses, 10);
-    createChart(
-      "chartGaps",
-      "bar",
-      topGaps.map(x => x[0]),
-      topGaps.map(x => x[1]),
-      "Gaps dominants",
-      "#c94f4f"
-    );
+    createChart("chartGaps", "bar", topGaps.map(x => x[0]), topGaps.map(x => x[1]), "Gaps dominants", "#c94f4f");
 
-    // Coverage index
     renderCoverageIndex(rows);
   }
 });
