@@ -15,7 +15,7 @@
 
 <header>
   <h1>Carte des acteurs VBG — Région de Kolda</h1>
-  <p>Visualisation des structures et heatmap de concentration des services.</p>
+  <p>Polygones administratifs, points d’acteurs et heatmap des services.</p>
 
   <div class="top-links">
     <a href="../">Accueil</a>
@@ -35,7 +35,14 @@
       </div>
 
       <div class="filter-group">
-        <label>Afficher</label>
+        <label>Département</label>
+        <select id="deptFilter">
+          <option value="">Tous</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Affichage</label>
         <select id="viewMode">
           <option value="markers">Points</option>
           <option value="heatmap">Heatmap</option>
@@ -49,91 +56,168 @@
 
 <script>
 const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
+const ADMIN_URL = "../data/sen_admin2_em.json";
 
 let allRows = [];
-let markersLayer = L.layerGroup();
+let adminGeo = null;
+let actorLayer = null;
 let heatLayer = null;
+let adminLayer = null;
 
 const actorFilter = document.getElementById("actorFilter");
+const deptFilter = document.getElementById("deptFilter");
 const viewMode = document.getElementById("viewMode");
 
-const map = L.map("map").setView([12.8985, -14.9413], 9);
+const map = L.map("map").setView([12.95, -14.45], 8);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap contributors"
 }).addTo(map);
 
 function safe(v){ return (v ?? "").toString().trim(); }
+
+function splitValues(value){
+  return safe(value).split(";").map(v => v.trim()).filter(Boolean);
+}
+
 function uniqueSorted(values){
   return [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b, "fr"));
 }
 
-function populateActorFilter(rows){
-  const types = uniqueSorted(rows.map(r => safe(r.actor_type)));
-  actorFilter.innerHTML = `<option value="">Tous</option>` +
-    types.map(t => `<option value="${t}">${t}</option>`).join("");
+function normalizeDeptName(name){
+  const n = safe(name).toLowerCase();
+  if (n === "médina yorofoulah" || n === "medina yorofoula" || n === "médina-yorofoula" || n === "medina-yorofoula" || n === "médina yoro foulah") {
+    return "Médina Yoro Foulah";
+  }
+  if (n === "velingara") return "Vélingara";
+  if (n === "kolda") return "Kolda";
+  return safe(name);
 }
 
-function getFilteredRows(){
+function populateFilters(rows){
+  const actorTypes = uniqueSorted(rows.map(r => safe(r.actor_type)));
+  const departments = uniqueSorted(rows.flatMap(r => splitValues(r["departement(s)"]).map(normalizeDeptName)));
+
+  actorFilter.innerHTML = `<option value="">Tous</option>` +
+    actorTypes.map(t => `<option value="${t}">${t}</option>`).join("");
+
+  deptFilter.innerHTML = `<option value="">Tous</option>` +
+    departments.map(d => `<option value="${d}">${d}</option>`).join("");
+}
+
+function actorMatches(row){
   const actor = safe(actorFilter.value);
-  return allRows.filter(r => {
-    const hasCoords = safe(r.latitude) && safe(r.longitude);
-    const actorOk = !actor || safe(r.actor_type) === actor;
-    return hasCoords && actorOk;
-  });
+  const dept = safe(deptFilter.value);
+
+  const actorOk = !actor || safe(row.actor_type) === actor;
+  const rowDepts = splitValues(row["departement(s)"]).map(normalizeDeptName);
+  const deptOk = !dept || rowDepts.includes(dept);
+
+  return actorOk && deptOk;
 }
 
 function buildPopup(r){
   return `
     <strong>${safe(r.structure)}</strong><br>
     <b>Type :</b> ${safe(r.actor_type)}<br>
-    <b>Services :</b> ${safe(r.service_gbv_type)}<br>
+    <b>Services VBG :</b> ${safe(r.service_gbv_type)}<br>
     <b>Département(s) :</b> ${safe(r["departement(s)"])}<br>
+    <b>Commune(s) :</b> ${safe(r["commune(s)"])}<br>
     <b>Contact :</b> ${safe(r.contact_name)}<br>
     <b>Téléphone :</b> ${safe(r.phone)}<br>
     <b>Email :</b> ${safe(r.email)}
   `;
 }
 
-function redrawMap(){
-  const rows = getFilteredRows();
-
-  markersLayer.clearLayers();
-  if (heatLayer) {
-    map.removeLayer(heatLayer);
-    heatLayer = null;
-  }
-
-  if (viewMode.value === "markers") {
-    rows.forEach(r => {
-      const lat = parseFloat(r.latitude);
-      const lng = parseFloat(r.longitude);
-
-      const marker = L.marker([lat, lng]).bindPopup(buildPopup(r));
-      markersLayer.addLayer(marker);
-    });
-
-    markersLayer.addTo(map);
-  } else {
-    const points = rows.map(r => [parseFloat(r.latitude), parseFloat(r.longitude), 0.8]);
-    heatLayer = L.heatLayer(points, { radius: 25, blur: 18, maxZoom: 12 });
-    heatLayer.addTo(map);
-  }
+function clearDynamicLayers(){
+  if (actorLayer) map.removeLayer(actorLayer);
+  if (heatLayer) map.removeLayer(heatLayer);
 }
 
-Papa.parse(CSV_URL, {
-  download: true,
-  header: true,
-  skipEmptyLines: true,
-  complete: function(res){
-    allRows = res.data || [];
-    populateActorFilter(allRows);
-    redrawMap();
+function drawAdminLayer(){
+  if (adminLayer) map.removeLayer(adminLayer);
+
+  adminLayer = L.geoJSON(adminGeo, {
+    filter: function(feature){
+      const adm1 = safe(feature.properties?.adm1_name);
+      return adm1.toLowerCase() === "kolda";
+    },
+    style: function(feature){
+      const featureDept = normalizeDeptName(feature.properties?.adm2_name);
+      const selectedDept = safe(deptFilter.value);
+
+      const isSelected = selectedDept && featureDept === selectedDept;
+
+      return {
+        color: isSelected ? "#f58220" : "#1f5fa8",
+        weight: isSelected ? 3 : 2,
+        fillColor: isSelected ? "#f58220" : "#1f5fa8",
+        fillOpacity: isSelected ? 0.18 : 0.08
+      };
+    },
+    onEachFeature: function(feature, layer){
+      const p = feature.properties || {};
+      const deptName = normalizeDeptName(p.adm2_name);
+      layer.bindPopup(`
+        <strong>${deptName}</strong><br>
+        <b>Région :</b> ${safe(p.adm1_name)}<br>
+        <b>Centre lat :</b> ${safe(p.center_lat)}<br>
+        <b>Centre lon :</b> ${safe(p.center_lon)}
+      `);
+    }
+  }).addTo(map);
+}
+
+function redrawActors(){
+  clearDynamicLayers();
+
+  const rows = allRows.filter(actorMatches).filter(r => safe(r.latitude) && safe(r.longitude));
+
+  if (viewMode.value === "markers") {
+    actorLayer = L.layerGroup();
+    rows.forEach(r => {
+      const marker = L.marker([parseFloat(r.latitude), parseFloat(r.longitude)]);
+      marker.bindPopup(buildPopup(r));
+      actorLayer.addLayer(marker);
+    });
+    actorLayer.addTo(map);
+  } else {
+    const pts = rows.map(r => [parseFloat(r.latitude), parseFloat(r.longitude), 0.8]);
+    heatLayer = L.heatLayer(pts, { radius: 25, blur: 18, maxZoom: 12 });
+    heatLayer.addTo(map);
   }
+
+  drawAdminLayer();
+}
+
+Promise.all([
+  fetch(ADMIN_URL).then(r => r.json()),
+  new Promise((resolve, reject) => {
+    Papa.parse(CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: res => resolve(res.data || []),
+      error: reject
+    });
+  })
+]).then(([geo, rows]) => {
+  adminGeo = geo;
+  allRows = rows;
+
+  populateFilters(allRows);
+  redrawActors();
+
+  const bounds = L.geoJSON(adminGeo, {
+    filter: f => safe(f.properties?.adm1_name).toLowerCase() === "kolda"
+  }).getBounds();
+
+  if (bounds.isValid()) map.fitBounds(bounds);
 });
 
-actorFilter.addEventListener("change", redrawMap);
-viewMode.addEventListener("change", redrawMap);
+actorFilter.addEventListener("change", redrawActors);
+deptFilter.addEventListener("change", redrawActors);
+viewMode.addEventListener("change", redrawActors);
 </script>
 
 </body>
