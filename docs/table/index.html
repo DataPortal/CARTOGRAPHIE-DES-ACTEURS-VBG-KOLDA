@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Table des acteurs VBG</title>
+
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+
+body{
+font-family:Segoe UI,Arial;
+margin:0;
+background:#f6f8fb;
+}
+
+header{
+background:#1f5fa8;
+color:white;
+padding:20px;
+text-align:center;
+}
+
+.container{
+padding:20px;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:white;
+}
+
+th{
+background:#1f5fa8;
+color:white;
+padding:10px;
+text-align:left;
+}
+
+td{
+padding:10px;
+border-bottom:1px solid #ddd;
+}
+
+tr:nth-child(even){
+background:#f2f2f2;
+}
+
+input{
+padding:8px;
+margin-bottom:15px;
+width:300px;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>Base de données des acteurs VBG</h1>
+<a href="../" style="color:white;">Retour accueil</a>
+</header>
+
+<div class="container">
+
+<input type="text" id="search" placeholder="Rechercher une structure...">
+
+<table id="dataTable">
+<thead>
+<tr>
+<th>ID</th>
+<th>Type acteur</th>
+<th>Structure</th>
+<th>Services</th>
+<th>Groupes cibles</th>
+<th>Départements</th>
+<th>Téléphone</th>
+<th>Email</th>
+</tr>
+</thead>
+
+<tbody id="tableBody">
+</tbody>
+
+</table>
+
+</div>
+
+<script>
+
+const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
+
+let allRows=[];
+
+function render(rows){
+
+const body=document.getElementById("tableBody");
+
+body.innerHTML="";
+
+rows.forEach(r=>{
+
+const tr=document.createElement("tr");
+
+tr.innerHTML=`
+
+<td>${r.id||""}</td>
+<td>${r.actor_type||""}</td>
+<td>${r.structure||""}</td>
+<td>${r.service_domains||""}</td>
+<td>${r.target_groups||""}</td>
+<td>${r["departement(s)"]||""}</td>
+<td>${r.phone||""}</td>
+<td>${r.email||""}</td>
+
+`;
+
+body.appendChild(tr);
+
+});
+
+}
+
+Papa.parse(CSV_URL,{
+
+download:true,
+header:true,
+
+complete:function(res){
+
+allRows=res.data;
+render(allRows);
+
+}
+
+});
+
+document.getElementById("search").addEventListener("input",function(){
+
+const q=this.value.toLowerCase();
+
+const filtered=allRows.filter(r=>
+
+(r.structure||"").toLowerCase().includes(q)
+
+);
+
+render(filtered);
+
+});
+
+</script>
+
+</body>
+</html>
