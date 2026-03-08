@@ -129,6 +129,10 @@ function makePill(text){
   return text ? `<span class="pill">${text}</span>` : "";
 }
 
+function makePills(value){
+  return splitValues(value).map(v => `<span class="pill">${v}</span>`).join(" ");
+}
+
 function populateSelect(selectEl, values, label){
   selectEl.innerHTML = `<option value="">${label}</option>` +
     values.map(v => `<option value="${v}">${v}</option>`).join("");
@@ -175,11 +179,11 @@ function renderTable(rows){
       <td>${makePill(safe(row.actor_type))}</td>
       <td><strong>${safe(row.structure)}</strong></td>
       <td>${safe(row.service_domains)}</td>
-      <td>${safe(row.service_gbv_type)}</td>
+      <td>${makePills(row.service_gbv_type)}</td>
       <td>${safe(row.target_groups)}</td>
       <td>${safe(row.region)}</td>
-      <td>${safe(row["departement(s)"])}</td>
-      <td>${safe(row["commune(s)"])}</td>
+      <td>${makePills(row["departement(s)"])}</td>
+      <td>${makePills(row["commune(s)"])}</td>
       <td>${safe(row.coverage_level)}</td>
       <td>${safe(row.forces)}</td>
       <td>${safe(row.gaps)}</td>
