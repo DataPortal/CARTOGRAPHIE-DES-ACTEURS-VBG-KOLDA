@@ -214,6 +214,7 @@ tbody tr:hover{
   font-size:11px;
   font-weight:700;
   white-space:nowrap;
+  margin:0 4px 4px 0;
 }
 
 .empty{
@@ -238,6 +239,16 @@ tbody tr:hover{
 #map{
   height:75vh;
   width:100%;
+}
+
+.legend{
+  background:#fff;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  font-size:12px;
+  line-height:1.5;
 }
 
 .small{
