@@ -5,12 +5,110 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Cartographie des acteurs VBG — Kolda</title>
   <link rel="stylesheet" href="./assets/css/style.css">
+
+  <style>
+    .hero{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:24px;
+      align-items:center;
+      margin-bottom:28px;
+    }
+
+    .hero-card{
+      background:#fff;
+      border:1px solid rgba(11,18,32,.12);
+      border-radius:16px;
+      box-shadow:0 8px 20px rgba(11,18,32,.06);
+      overflow:hidden;
+    }
+
+    .hero-text{
+      padding:24px;
+    }
+
+    .hero-text h2{
+      margin:0 0 12px;
+      font-size:30px;
+      line-height:1.2;
+      color:#0b1220;
+    }
+
+    .hero-text p{
+      margin:0 0 14px;
+      font-size:15px;
+      line-height:1.7;
+      color:#334155;
+    }
+
+    .hero-actions{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:18px;
+    }
+
+    .hero-image-wrap{
+      height:100%;
+      min-height:420px;
+      overflow:hidden;
+      background:#e5e7eb;
+    }
+
+    .hero-image{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+
+    .section-intro{
+      margin:0 0 18px;
+      font-size:14px;
+      color:#5b6b80;
+    }
+
+    .feature-card{
+      background:#fff;
+      border:1px solid rgba(11,18,32,.12);
+      border-radius:14px;
+      box-shadow:0 8px 20px rgba(11,18,32,.06);
+      padding:20px;
+    }
+
+    .feature-card h3{
+      margin:0 0 10px;
+      font-size:18px;
+      color:#0b1220;
+    }
+
+    .feature-card p{
+      margin:0 0 14px;
+      font-size:14px;
+      line-height:1.6;
+      color:#334155;
+    }
+
+    @media (max-width: 980px){
+      .hero{
+        grid-template-columns:1fr;
+      }
+
+      .hero-image-wrap{
+        min-height:320px;
+      }
+
+      .hero-text h2{
+        font-size:24px;
+      }
+    }
+  </style>
 </head>
 <body>
 
 <header>
   <h1>Cartographie des acteurs VBG — Région de Kolda</h1>
-  <p>Plateforme de consultation des données, cartographie et analyse du système VBG.</p>
+  <p>Plateforme de consultation des données, cartographie et analyse du système de réponse aux violences basées sur le genre.</p>
 
   <div class="top-links">
     <a href="./table/">Base de données</a>
@@ -21,6 +119,31 @@
 </header>
 
 <div class="container">
+
+  <div class="hero">
+    <div class="hero-card hero-text">
+      <h2>Visualiser, comprendre et renforcer le système de réponse aux VBG à Kolda</h2>
+      <p>
+        Cette plateforme présente la cartographie des structures intervenant dans la prévention et la prise en charge des violences basées sur le genre dans la région de Kolda. Elle met à disposition une base de données structurée, une carte interactive et un espace d’analyse pour appuyer la coordination, l’orientation et la décision.
+      </p>
+      <p>
+        Le dispositif réunit des services étatiques et des organisations de la société civile, avec des rôles complémentaires dans la prévention, l’accompagnement psychosocial, la prise en charge, le référencement et la mobilisation communautaire.
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="./map/">Voir la carte</a>
+        <a class="btn btn-secondary" href="./analysis/">Voir l’analyse</a>
+      </div>
+    </div>
+
+    <div class="hero-card hero-image-wrap">
+      <img
+        src="./assets/img/kolda-vbg.jpg"
+        alt="Activité communautaire de sensibilisation et d’échange avec des adolescentes et jeunes filles dans la région de Kolda"
+        class="hero-image"
+      >
+    </div>
+  </div>
 
   <div class="kpi-grid">
     <div class="kpi">
@@ -41,22 +164,32 @@
     </div>
   </div>
 
+  <p class="section-intro">
+    Accède aux différents modules pour explorer les données, visualiser la couverture territoriale des services et analyser les principales tendances du système VBG dans la région.
+  </p>
+
   <div class="grid">
-    <div class="card" style="padding:20px;">
-      <h2 class="section-title">Carte interactive</h2>
-      <p>Polygones admin2, points des acteurs, et heatmap de concentration.</p>
+    <div class="feature-card">
+      <h3>Carte interactive</h3>
+      <p>
+        Explore la répartition géographique des structures, visualise les départements ciblés et affiche les acteurs sous forme de points ou de heatmap.
+      </p>
       <a class="btn btn-primary" href="./map/">Ouvrir la carte</a>
     </div>
 
-    <div class="card" style="padding:20px;">
-      <h2 class="section-title">Base de données</h2>
-      <p>Table complète avec recherche et filtres multi-critères.</p>
+    <div class="feature-card">
+      <h3>Base de données</h3>
+      <p>
+        Consulte l’ensemble des structures dans un tableau détaillé avec filtres multi-critères sur les acteurs, les départements, les services et la couverture.
+      </p>
       <a class="btn btn-primary" href="./table/">Voir la table</a>
     </div>
 
-    <div class="card" style="padding:20px;">
-      <h2 class="section-title">Analyse</h2>
-      <p>KPI, répartition territoriale, services, gaps et indice de couverture VBG.</p>
+    <div class="feature-card">
+      <h3>Analyse</h3>
+      <p>
+        Accède aux KPI, aux graphiques, à l’analyse des gaps, à l’indice de couverture VBG et aux messages stratégiques issus de la cartographie.
+      </p>
       <a class="btn btn-primary" href="./analysis/">Voir l’analyse</a>
     </div>
   </div>
@@ -65,27 +198,28 @@
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
-const CSV_URL = "./data/actors_vbg_kolda_geo_ready.csv";
+  const CSV_URL = "./data/actors_vbg_kolda_geo_ready.csv";
 
-function safe(v){ return (v ?? "").toString().trim(); }
+  function safe(v){ return (v ?? "").toString().trim(); }
 
-Papa.parse(CSV_URL, {
-  download: true,
-  header: true,
-  skipEmptyLines: true,
-  complete: function(res){
-    const rows = res.data || [];
-    const total = rows.length;
-    const state = rows.filter(r => safe(r.actor_type).toLowerCase().includes("étatique")).length;
-    const osc = total - state;
-    const geo = rows.filter(r => safe(r.latitude) && safe(r.longitude)).length;
+  Papa.parse(CSV_URL, {
+    download: true,
+    header: true,
+    skipEmptyLines: true,
+    complete: function(res){
+      const rows = res.data || [];
 
-    document.getElementById("kpiTotal").textContent = total;
-    document.getElementById("kpiState").textContent = state;
-    document.getElementById("kpiOsc").textContent = osc;
-    document.getElementById("kpiGeo").textContent = geo;
-  }
-});
+      const total = rows.length;
+      const state = rows.filter(r => safe(r.actor_type).toLowerCase().includes("étatique")).length;
+      const osc = total - state;
+      const geo = rows.filter(r => safe(r.latitude) && safe(r.longitude)).length;
+
+      document.getElementById("kpiTotal").textContent = total;
+      document.getElementById("kpiState").textContent = state;
+      document.getElementById("kpiOsc").textContent = osc;
+      document.getElementById("kpiGeo").textContent = geo;
+    }
+  });
 </script>
 
 </body>
