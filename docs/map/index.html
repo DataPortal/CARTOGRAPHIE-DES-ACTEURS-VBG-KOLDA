@@ -1,36 +1,140 @@
-<h1>Analyse du système VBG — Région de Kolda</h1>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Carte des acteurs VBG — Kolda</title>
 
-<section class="kpis">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat/dist/leaflet-heat.js"></script>
+</head>
+<body>
 
-Acteurs
-Services étatiques
-ONG
-Types de services
+<header>
+  <h1>Carte des acteurs VBG — Région de Kolda</h1>
+  <p>Visualisation des structures et heatmap de concentration des services.</p>
 
-</section>
+  <div class="top-links">
+    <a href="../">Accueil</a>
+    <a href="../table/">Base de données</a>
+    <a href="../analysis/">Analyse</a>
+  </div>
+</header>
 
-<section class="charts">
+<div class="container">
+  <div class="card" style="padding:16px;">
+    <div class="filters" style="margin-bottom:12px;">
+      <div class="filter-group">
+        <label>Type d’acteur</label>
+        <select id="actorFilter">
+          <option value="">Tous</option>
+        </select>
+      </div>
 
-Acteurs par type
-Acteurs par département
-Types de services
+      <div class="filter-group">
+        <label>Afficher</label>
+        <select id="viewMode">
+          <option value="markers">Points</option>
+          <option value="heatmap">Heatmap</option>
+        </select>
+      </div>
+    </div>
 
-</section>
+    <div id="map"></div>
+  </div>
+</div>
 
-<section class="analysis">
+<script>
+const CSV_URL = "../data/actors_vbg_kolda_geo_ready.csv";
 
-Analyse automatique des gaps
+let allRows = [];
+let markersLayer = L.layerGroup();
+let heatLayer = null;
 
-</section>
+const actorFilter = document.getElementById("actorFilter");
+const viewMode = document.getElementById("viewMode");
 
-<section>
+const map = L.map("map").setView([12.8985, -14.9413], 9);
 
-Indice de couverture VBG
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
 
-</section>
+function safe(v){ return (v ?? "").toString().trim(); }
+function uniqueSorted(values){
+  return [...new Set(values.filter(Boolean))].sort((a,b)=>a.localeCompare(b, "fr"));
+}
 
-<section>
+function populateActorFilter(rows){
+  const types = uniqueSorted(rows.map(r => safe(r.actor_type)));
+  actorFilter.innerHTML = `<option value="">Tous</option>` +
+    types.map(t => `<option value="${t}">${t}</option>`).join("");
+}
 
-Carte heatmap
+function getFilteredRows(){
+  const actor = safe(actorFilter.value);
+  return allRows.filter(r => {
+    const hasCoords = safe(r.latitude) && safe(r.longitude);
+    const actorOk = !actor || safe(r.actor_type) === actor;
+    return hasCoords && actorOk;
+  });
+}
 
-</section>
+function buildPopup(r){
+  return `
+    <strong>${safe(r.structure)}</strong><br>
+    <b>Type :</b> ${safe(r.actor_type)}<br>
+    <b>Services :</b> ${safe(r.service_gbv_type)}<br>
+    <b>Département(s) :</b> ${safe(r["departement(s)"])}<br>
+    <b>Contact :</b> ${safe(r.contact_name)}<br>
+    <b>Téléphone :</b> ${safe(r.phone)}<br>
+    <b>Email :</b> ${safe(r.email)}
+  `;
+}
+
+function redrawMap(){
+  const rows = getFilteredRows();
+
+  markersLayer.clearLayers();
+  if (heatLayer) {
+    map.removeLayer(heatLayer);
+    heatLayer = null;
+  }
+
+  if (viewMode.value === "markers") {
+    rows.forEach(r => {
+      const lat = parseFloat(r.latitude);
+      const lng = parseFloat(r.longitude);
+
+      const marker = L.marker([lat, lng]).bindPopup(buildPopup(r));
+      markersLayer.addLayer(marker);
+    });
+
+    markersLayer.addTo(map);
+  } else {
+    const points = rows.map(r => [parseFloat(r.latitude), parseFloat(r.longitude), 0.8]);
+    heatLayer = L.heatLayer(points, { radius: 25, blur: 18, maxZoom: 12 });
+    heatLayer.addTo(map);
+  }
+}
+
+Papa.parse(CSV_URL, {
+  download: true,
+  header: true,
+  skipEmptyLines: true,
+  complete: function(res){
+    allRows = res.data || [];
+    populateActorFilter(allRows);
+    redrawMap();
+  }
+});
+
+actorFilter.addEventListener("change", redrawMap);
+viewMode.addEventListener("change", redrawMap);
+</script>
+
+</body>
+</html>
