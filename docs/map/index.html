@@ -51,6 +51,27 @@
       color: var(--muted);
     }
 
+    .map-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+
+    .map-actions button{
+      border:1px solid rgba(11,18,32,.12);
+      background:#fff;
+      color:#0b1220;
+      padding:9px 12px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+    }
+
+    .map-actions button:hover{
+      background:#f8fafc;
+    }
+
     .panel-title{
       margin:0 0 8px;
       font-size:20px;
@@ -195,20 +216,9 @@
       flex:0 0 auto;
     }
 
-    .leaflet-popup-content,
-    .leaflet-tooltip{
+    .leaflet-popup-content{
       font-size:13px;
       line-height:1.45;
-    }
-
-    .dept-tooltip{
-      min-width:240px;
-    }
-
-    .dept-tooltip hr{
-      border:none;
-      border-top:1px solid #e5e7eb;
-      margin:8px 0;
     }
 
     @media (max-width: 1100px){
@@ -245,7 +255,7 @@
 
     <div class="map-card">
       <p class="map-toolbar-note">
-        Clique sur un département pour afficher ses chiffres clés, ses acteurs et ses services dans le panneau de droite.
+        Clique sur un département pour afficher ses chiffres clés. La carte s’ajuste automatiquement à la sélection.
       </p>
 
       <div class="filters" style="margin-bottom:12px;">
@@ -277,6 +287,11 @@
             <option value="heatmap">Heatmap services</option>
           </select>
         </div>
+      </div>
+
+      <div class="map-actions">
+        <button id="btnResetView" type="button">Réinitialiser la vue</button>
+        <button id="btnZoomData" type="button">Zoom sur les données visibles</button>
       </div>
 
       <div id="map"></div>
@@ -351,11 +366,14 @@
   let heatLayer = null;
   let adminLayer = null;
   let legendControl = null;
+  let currentSelectedDept = "";
 
   const actorFilter = document.getElementById("actorFilter");
   const deptFilter = document.getElementById("deptFilter");
   const serviceFilter = document.getElementById("serviceFilter");
   const viewMode = document.getElementById("viewMode");
+  const btnResetView = document.getElementById("btnResetView");
+  const btnZoomData = document.getElementById("btnZoomData");
 
   const panelDeptTitle = document.getElementById("panelDeptTitle");
   const panelDeptSubtitle = document.getElementById("panelDeptSubtitle");
@@ -373,17 +391,14 @@
   );
 
   const map = L.map("map", {
-    maxBounds: senegalBounds,
-    maxBoundsViscosity: 1.0,
-    minZoom: 7,
-    maxZoom: 12
+    minZoom: 6,
+    maxZoom: 14,
+    zoomControl: true
   }).setView([14.4, -14.4], 7);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "&copy; OpenStreetMap contributors"
   }).addTo(map);
-
-  map.fitBounds(senegalBounds);
 
   function safe(v){
     return (v ?? "").toString().trim();
@@ -483,6 +498,7 @@
       services.map(s => `<option value="${s}">${s}</option>`).join("");
 
     loadFilters();
+    currentSelectedDept = safe(deptFilter.value);
   }
 
   function actorMatches(row){
@@ -565,44 +581,6 @@
     `).join("");
   }
 
-  function getDepartmentStats(deptName){
-    const rows = getDepartmentRows(deptName);
-    const totalActors = rows.length;
-    const stateActors = rows.filter(r => isStateActor(r.actor_type)).length;
-    const oscActors = totalActors - stateActors;
-    const services = uniqueSorted(rows.flatMap(r => splitValues(r.service_gbv_type)));
-
-    return {
-      totalActors,
-      stateActors,
-      oscActors,
-      servicesCount: services.length,
-      servicesPreview: services.slice(0, 5)
-    };
-  }
-
-  function buildDepartmentTooltip(feature){
-    const props = feature.properties || {};
-    const deptName = normalizeDeptName(props.adm2_name);
-    const regionName = safe(props.adm1_name);
-    const isTarget = departmentInScope(deptName);
-    const stats = getDepartmentStats(deptName);
-
-    return `
-      <div class="dept-tooltip">
-        <strong>${deptName}</strong><br>
-        <span style="color:#5b6b80;">Région : ${regionName}</span><br>
-        <span style="color:#5b6b80;">Département ciblé : ${isTarget ? "Oui" : "Non"}</span>
-        <hr>
-        <strong>Acteurs :</strong> ${stats.totalActors}<br>
-        <strong>Services étatiques :</strong> ${stats.stateActors}<br>
-        <strong>ONG / Associations :</strong> ${stats.oscActors}<br>
-        <strong>Types de services VBG :</strong> ${stats.servicesCount}<br>
-        <strong>Services clés :</strong> ${stats.servicesPreview.length ? stats.servicesPreview.join(", ") : "Aucun renseigné"}
-      </div>
-    `;
-  }
-
   function clearDynamicLayers(){
     if (actorLayer) {
       map.removeLayer(actorLayer);
@@ -613,6 +591,56 @@
       map.removeLayer(heatLayer);
       heatLayer = null;
     }
+  }
+
+  function getAdminFeatureBoundsByDept(deptName){
+    if (!adminGeo || !deptName) return null;
+
+    const layer = L.geoJSON(adminGeo, {
+      filter: function(feature){
+        return normalizeDeptName(feature.properties?.adm2_name) === normalizeDeptName(deptName);
+      }
+    });
+
+    const bounds = layer.getBounds();
+    return bounds.isValid() ? bounds : null;
+  }
+
+  function zoomToDepartment(deptName){
+    const bounds = getAdminFeatureBoundsByDept(deptName);
+    if (bounds) {
+      map.fitBounds(bounds.pad(0.15), { animate: true });
+    }
+  }
+
+  function zoomToVisibleData(){
+    const layers = [];
+
+    if (actorLayer) layers.push(actorLayer);
+    if (adminLayer && currentSelectedDept) {
+      const deptBounds = getAdminFeatureBoundsByDept(currentSelectedDept);
+      if (deptBounds) {
+        map.fitBounds(deptBounds.pad(0.15), { animate: true });
+        return;
+      }
+    }
+
+    if (layers.length) {
+      const group = L.featureGroup(layers);
+      const bounds = group.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds.pad(0.2), { animate: true });
+        return;
+      }
+    }
+
+    map.fitBounds(senegalBounds, { animate: true });
+  }
+
+  function resetMapView(){
+    deptFilter.value = "";
+    currentSelectedDept = "";
+    redrawMap(true);
   }
 
   function drawAdminLayer(){
@@ -670,12 +698,6 @@
           <b>Département ciblé :</b> ${isTarget ? "Oui" : "Non"}
         `);
 
-        layer.bindTooltip(buildDepartmentTooltip(feature), {
-          sticky: true,
-          direction: "top",
-          opacity: 0.96
-        });
-
         layer.on("mouseover", function(){
           this.setStyle({
             weight: 4,
@@ -689,8 +711,8 @@
 
         layer.on("click", function(){
           deptFilter.value = deptName;
-          redrawMap();
-          renderPanel(deptName);
+          currentSelectedDept = deptName;
+          redrawMap(true);
         });
       }
     }).addTo(map);
@@ -778,21 +800,31 @@
         0.9
       ]);
 
-      heatLayer = L.heatLayer(points, {
-        radius: 28,
-        blur: 18,
-        maxZoom: 12
-      });
-
-      heatLayer.addTo(map);
+      if (points.length) {
+        heatLayer = L.heatLayer(points, {
+          radius: 28,
+          blur: 18,
+          maxZoom: 12
+        });
+        heatLayer.addTo(map);
+      }
     }
   }
 
-  function redrawMap(){
+  function redrawMap(autoZoom = false){
+    currentSelectedDept = safe(deptFilter.value);
     redrawActors();
     drawAdminLayer();
     drawLegend();
-    renderPanel(safe(deptFilter.value));
+    renderPanel(currentSelectedDept);
+
+    if (autoZoom) {
+      if (currentSelectedDept) {
+        zoomToDepartment(currentSelectedDept);
+      } else {
+        zoomToVisibleData();
+      }
+    }
   }
 
   Promise.all([
@@ -812,13 +844,12 @@
     allRows = rows;
 
     populateFilters(allRows);
-    redrawMap();
+    redrawMap(false);
 
-    const bounds = L.geoJSON(adminGeo).getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds);
+    if (safe(deptFilter.value)) {
+      zoomToDepartment(safe(deptFilter.value));
     } else {
-      map.fitBounds(senegalBounds);
+      map.fitBounds(senegalBounds, { animate: true });
     }
   })
   .catch(err => {
@@ -826,10 +857,12 @@
     alert("Erreur lors du chargement des données cartographiques.");
   });
 
-  actorFilter.addEventListener("change", redrawMap);
-  deptFilter.addEventListener("change", redrawMap);
-  serviceFilter.addEventListener("change", redrawMap);
-  viewMode.addEventListener("change", redrawMap);
+  actorFilter.addEventListener("change", () => redrawMap(true));
+  deptFilter.addEventListener("change", () => redrawMap(true));
+  serviceFilter.addEventListener("change", () => redrawMap(true));
+  viewMode.addEventListener("change", () => redrawMap(true));
+  btnResetView.addEventListener("click", resetMapView);
+  btnZoomData.addEventListener("click", zoomToVisibleData);
 </script>
 
 </body>
